@@ -1,6 +1,6 @@
-# Meridian — Phase 1
+# Meridian — Phase 2
 
-Stock movement and tax exposure tracker. This is the Phase 1 starter: login, shipments dashboard, manual intake, reference-data views.
+Stock movement and tax exposure tracker. Phase 2 adds PDF/image upload with Claude-powered field extraction on top of the Phase 1 foundation (login, shipments dashboard, manual intake, reference-data views).
 
 **Stack:** Next.js 15 (App Router) · TypeScript · Tailwind v4 · Supabase (Postgres + Auth + RLS)
 
@@ -19,7 +19,8 @@ pnpm install      # or npm install / yarn
 1. Create a project at [supabase.com](https://supabase.com). Free tier is fine.
 2. Open **SQL Editor** → paste and run `db/schema.sql`.
 3. Paste and run `db/seed.sql` (reference data + six sample shipments).
-4. Go to **Authentication → Providers**, enable **Google** and **Email** (magic link is on by default).
+4. Paste and run `db/phase2.sql` (document-extraction table + storage bucket + RLS).
+5. Go to **Authentication → Providers**, enable **Google** and **Email** (magic link is on by default).
    - For Google: set up an OAuth client in Google Cloud, paste the client ID/secret into Supabase, and add `https://[your-vercel-domain]/api/auth/callback` and `http://localhost:3000/api/auth/callback` to the authorised redirect URIs.
 
 ### 3. Env
@@ -28,7 +29,12 @@ pnpm install      # or npm install / yarn
 cp .env.local.example .env.local
 ```
 
-Fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from Supabase → **Project Settings → API**. Leave the Phase 2+ keys blank for now.
+Fill in:
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from Supabase → **Project Settings → API**
+- `SUPABASE_SERVICE_ROLE_KEY` from the same page (server-only, used by `/api/extract` to read uploaded files)
+- `ANTHROPIC_API_KEY` from [console.anthropic.com](https://console.anthropic.com/settings/keys)
+
+Leave the Phase 3+ keys blank for now. Remember to add all three to your Vercel project's environment variables as well.
 
 ### 4. Run
 
@@ -57,10 +63,10 @@ Open `http://localhost:3000`. You should be redirected to `/login`. Sign in with
 - ✅ Reference data pages for VAT, Incoterms, Commodity Codes
 - ✅ Row-level security — signed-out users are redirected to login
 - ✅ Sign out
+- ✅ **Phase 2:** PDF/image upload → Claude Opus 4.7 extracts fields → form pre-fills with green confidence highlights → user reviews + saves
 
 ## What's coming
 
-- **Phase 2:** PDF/image upload in the intake modal → Claude extracts fields → user confirms → saves.
 - **Phase 3:** `shipments@[your-domain]` email ingest via Postmark; Supabase Realtime for live collaboration.
 - **Phase 4:** Tax Exposure dashboard, xlsx export, flags engine, weekly digest email.
 
