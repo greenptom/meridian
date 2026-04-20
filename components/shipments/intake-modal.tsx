@@ -389,18 +389,21 @@ export function IntakeModal({
                   label="Commodity code"
                   confidence={autoFilled.commodity_code}
                 >
-                  <select
+                  <input
+                    type="text"
+                    list="commodity-codes-list"
                     className={inputClass(autoFilled.commodity_code)}
+                    placeholder="e.g. 0901 21 00 00"
                     value={form.commodity_code}
                     onChange={(e) => update("commodity_code", e.target.value)}
-                  >
-                    <option value="">— select product —</option>
+                  />
+                  <datalist id="commodity-codes-list">
                     {commodityCodes.map((c) => (
                       <option key={c.code} value={c.code}>
                         {c.product_type} · {c.code}
                       </option>
                     ))}
-                  </select>
+                  </datalist>
                 </FormField>
                 <FormField
                   label="Invoice value"

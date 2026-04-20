@@ -105,7 +105,6 @@ export async function POST(req: NextRequest) {
     const response = await anthropic.messages.create({
       model: "claude-opus-4-7",
       max_tokens: 16000,
-      thinking: { type: "adaptive" },
       system: EXTRACTION_SYSTEM_PROMPT,
       tools: [EXTRACT_TOOL_SCHEMA],
       tool_choice: {

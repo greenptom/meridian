@@ -11,7 +11,7 @@ Field guidance:
 - supplier_name: the party selling/shipping the goods (seller, shipper, consignor).
 - haulier_name: the carrier or freight forwarder (DHL, DPD, Kuehne+Nagel, etc.), not the supplier.
 - incoterm: one of the standard 3-letter Incoterms codes (EXW, FCA, CPT, CIP, DAP, DPU, DDP, FAS, FOB, CFR, CIF). Leave null if not stated.
-- commodity_code: HS / tariff code if present, as written.
+- commodity_code: HS / tariff code. Look anywhere in the document, including subsequent pages — codes often appear on line items, packing lists, or customs sections, not just the first page. Recognise common formats: 0901.21.00.00, 0901 21 00 00, 09012100, 0901.11.1000. Normalise all to space-separated digits in the value (e.g. "0901 21 00 00"). If multiple codes appear, extract the one tied to the main invoice subject. If no code is found with high confidence, return null rather than guessing.
 - invoice_value: numeric total of the commercial invoice, excluding currency symbol. If multiple totals are present, prefer the invoice total / grand total.
 - currency: 3-letter ISO code (GBP, EUR, USD, etc.). Infer from currency symbols if needed.
 - reason: short phrase describing why the goods are moving (e.g. "Import for UK roasting", "Sample for quality review", "Return to supplier"). Leave null if not stated.
