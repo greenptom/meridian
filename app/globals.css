@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Fraunces", Georgia, serif;
+  --font-sans: "Inter Tight", -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-ink: #1a1a1a;
+  --color-ink-soft: #4a4a4a;
+  --color-ink-faint: #8a8a8a;
+  --color-paper: #f6f4ef;
+  --color-paper-warm: #efebe2;
+  --color-line: #d9d4c7;
+  --color-line-soft: #e8e3d6;
+  --color-card: #ffffff;
+  --color-accent: #b8432a;
+  --color-accent-soft: #f0dfd9;
+  --color-ok: #3d6b4e;
+  --color-ok-soft: #dde8e0;
+  --color-warn: #b88a2a;
+  --color-warn-soft: #f1e6cc;
+}
+
+@layer base {
+  html, body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      radial-gradient(circle at 10% 0%, rgba(184, 67, 42, 0.03), transparent 40%),
+      radial-gradient(circle at 90% 100%, rgba(61, 107, 78, 0.03), transparent 40%);
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 5px;
+    border: 2px solid var(--color-paper);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-ink-faint); }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-all;
+    border-color: var(--color-line);
+    background: var(--color-card);
+    color: var(--color-ink);
+  }
+  .btn:hover {
+    border-color: var(--color-ink);
+    transform: translateY(-1px);
+    box-shadow: 0 1px 2px rgba(20, 15, 5, 0.04);
+  }
+  .btn-primary {
+    background: var(--color-ink);
+    color: var(--color-paper);
+    border-color: var(--color-ink);
+  }
+  .btn-primary:hover {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+
+  .status {
+    @apply inline-flex items-center gap-1.5 rounded px-2 py-1 font-mono text-[10px] uppercase tracking-wider;
+  }
+  .status::before {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .status-active { background: var(--color-ok-soft); color: var(--color-ok); }
+  .status-draft { background: var(--color-paper-warm); color: var(--color-ink-soft); }
+  .status-review { background: var(--color-warn-soft); color: var(--color-warn); }
+  .status-alert { background: var(--color-accent-soft); color: var(--color-accent); }
+
+  .incoterm {
+    @apply inline-block rounded px-2 py-0.5 font-mono text-[11px] tracking-wide;
+    background: var(--color-paper-warm);
+  }
+}
