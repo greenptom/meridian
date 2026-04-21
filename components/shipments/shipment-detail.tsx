@@ -10,6 +10,7 @@ import type {
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
 import { formatCurrency } from "@/lib/utils";
 import { ClientTime } from "@/components/ui/client-time";
+import { MarkLandedModal } from "./mark-landed-modal";
 
 const statusLabel: Record<ShipmentStatus, string> = {
   active: "Active",
@@ -26,6 +27,9 @@ const EVENT_LABEL: Record<ShipmentEvent["type"], string> = {
   document_attached: "Document attached",
   document_extracted: "Document extracted",
   note_added: "Note added",
+  landed: "Landed",
+  customs_cleared: "Customs cleared",
+  customs_held: "Customs held",
 };
 
 export function ShipmentDetail({
@@ -39,6 +43,9 @@ export function ShipmentDetail({
   events: ShipmentEvent[];
   onEdit: () => void;
 }) {
+  const [landedOpen, setLandedOpen] = useState(false);
+  const canMarkLanded = s.status === "active" && !s.actual_landed_date;
+
   return (
     <aside
       className="rounded-[10px] border overflow-y-auto sticky top-6 self-start max-h-[calc(100vh-48px)] max-[1100px]:static max-[1100px]:max-h-none"
@@ -52,13 +59,27 @@ export function ShipmentDetail({
           <div className="font-mono text-[11px] text-[color:var(--color-ink-faint)] tracking-wider">
             {s.ref} · <ClientTime iso={s.created_at} mode="date" />
           </div>
-          <button
-            onClick={onEdit}
-            className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded border hover:bg-[color:var(--color-paper-warm)]"
-            style={{ borderColor: "var(--color-line)" }}
-          >
-            Edit
-          </button>
+          <div className="flex gap-2">
+            {canMarkLanded && (
+              <button
+                onClick={() => setLandedOpen(true)}
+                className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded"
+                style={{
+                  background: "var(--color-ink)",
+                  color: "var(--color-paper)",
+                }}
+              >
+                Mark as landed
+              </button>
+            )}
+            <button
+              onClick={onEdit}
+              className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded border hover:bg-[color:var(--color-paper-warm)]"
+              style={{ borderColor: "var(--color-line)" }}
+            >
+              Edit
+            </button>
+          </div>
         </div>
         <div className="font-serif text-[22px] font-medium tracking-tight mt-1 leading-snug">
           {s.origin_country ?? "Unknown"}
@@ -122,6 +143,12 @@ export function ShipmentDetail({
       <Section label="Activity">
         <ActivityList shipment={s} events={events} />
       </Section>
+
+      <MarkLandedModal
+        shipment={s}
+        open={landedOpen}
+        onClose={() => setLandedOpen(false)}
+      />
     </aside>
   );
 }

@@ -106,7 +106,10 @@ export type ShipmentEventType =
   | "status_changed"
   | "document_attached"
   | "document_extracted"
-  | "note_added";
+  | "note_added"
+  | "landed"
+  | "customs_cleared"
+  | "customs_held";
 
 export interface ShipmentEventChange {
   from: unknown;

@@ -197,13 +197,18 @@ export async function updateShipment(
     .eq("id", id);
   if (updateError) return { ok: false, error: updateError.message };
 
-  const eventsToInsert: Array<{
+  type EventInsert = {
     shipment_id: string;
-    type: "status_changed" | "updated";
+    type:
+      | "status_changed"
+      | "updated"
+      | "customs_cleared"
+      | "customs_held";
     summary: string;
     changes: Record<string, ShipmentEventChange>;
     created_by: string;
-  }> = [];
+  };
+  const eventsToInsert: EventInsert[] = [];
 
   if (statusChanged) {
     const fromLabel = STATUS_LABELS[current.status] ?? current.status;
@@ -227,6 +232,32 @@ export async function updateShipment(
     });
   }
 
+  const customsBefore = current.customs_status;
+  const customsAfter = input.customs_status;
+  if (customsBefore !== customsAfter) {
+    if (customsAfter === "cleared") {
+      eventsToInsert.push({
+        shipment_id: id,
+        type: "customs_cleared",
+        summary: "Customs cleared",
+        changes: {
+          customs_status: { from: customsBefore, to: customsAfter },
+        },
+        created_by: user.id,
+      });
+    } else if (customsAfter === "held") {
+      eventsToInsert.push({
+        shipment_id: id,
+        type: "customs_held",
+        summary: "Customs held",
+        changes: {
+          customs_status: { from: customsBefore, to: customsAfter },
+        },
+        created_by: user.id,
+      });
+    }
+  }
+
   if (eventsToInsert.length > 0) {
     await supabase.from("shipment_events").insert(eventsToInsert);
   }
@@ -234,4 +265,124 @@ export async function updateShipment(
   revalidatePath("/shipments");
   revalidatePath("/drafts");
   return { ok: true, data: undefined };
+}
+
+export type LandingInput = {
+  actual_landed_date: string;
+  freight_cost: number | null;
+  insurance_cost: number | null;
+  duty_cost: number | null;
+  other_costs: number | null;
+};
+
+export async function markShipmentLanded(
+  id: string,
+  input: LandingInput,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const { data: current, error: fetchError } = await supabase
+    .from("shipments")
+    .select(
+      "status, invoice_value, freight_cost, insurance_cost, duty_cost, other_costs, currency",
+    )
+    .eq("id", id)
+    .single();
+  if (fetchError || !current) {
+    return { ok: false, error: fetchError?.message ?? "Shipment not found" };
+  }
+
+  const nextStatus: ShipmentStatus =
+    current.status === "active" ? "review" : current.status;
+  const statusFlipped = nextStatus !== current.status;
+
+  const landingUpdate = {
+    actual_landed_date: input.actual_landed_date,
+    freight_cost: input.freight_cost,
+    insurance_cost: input.insurance_cost,
+    duty_cost: input.duty_cost,
+    other_costs: input.other_costs,
+    status: nextStatus,
+  };
+
+  const { error: updateError } = await supabase
+    .from("shipments")
+    .update(landingUpdate)
+    .eq("id", id);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  const totalLanded =
+    current.invoice_value != null
+      ? current.invoice_value +
+        (input.freight_cost ?? 0) +
+        (input.insurance_cost ?? 0) +
+        (input.duty_cost ?? 0) +
+        (input.other_costs ?? 0)
+      : null;
+
+  type LandingEventInsert = {
+    shipment_id: string;
+    type: "landed" | "status_changed";
+    summary: string;
+    changes: Record<string, ShipmentEventChange>;
+    created_by: string;
+  };
+
+  const eventsToInsert: LandingEventInsert[] = [
+    {
+      shipment_id: id,
+      type: "landed",
+      summary: totalLanded != null
+        ? `Landed ${input.actual_landed_date} · total ${formatCostSummary(totalLanded, current.currency)}`
+        : `Landed ${input.actual_landed_date}`,
+      changes: {
+        actual_landed_date: {
+          from: null,
+          to: input.actual_landed_date,
+        },
+        freight_cost: { from: current.freight_cost, to: input.freight_cost },
+        insurance_cost: {
+          from: current.insurance_cost,
+          to: input.insurance_cost,
+        },
+        duty_cost: { from: current.duty_cost, to: input.duty_cost },
+        other_costs: { from: current.other_costs, to: input.other_costs },
+        total_landed_cost: { from: null, to: totalLanded },
+      },
+      created_by: user.id,
+    },
+  ];
+
+  if (statusFlipped) {
+    const fromLabel = STATUS_LABELS[current.status] ?? current.status;
+    const toLabel = STATUS_LABELS[nextStatus] ?? nextStatus;
+    eventsToInsert.push({
+      shipment_id: id,
+      type: "status_changed",
+      summary: `Status: ${fromLabel} → ${toLabel}`,
+      changes: { status: { from: current.status, to: nextStatus } },
+      created_by: user.id,
+    });
+  }
+
+  await supabase.from("shipment_events").insert(eventsToInsert);
+
+  revalidatePath("/shipments");
+  revalidatePath("/drafts");
+  return { ok: true, data: undefined };
+}
+
+function formatCostSummary(value: number, currency: string | null): string {
+  const code = currency ?? "GBP";
+  try {
+    return new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: code,
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return `${code} ${value.toLocaleString()}`;
+  }
 }
