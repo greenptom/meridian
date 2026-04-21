@@ -17,11 +17,14 @@ export function MarkLandedModal({
   shipment,
   open,
   onClose,
+  onRequestEditQuantity,
 }: {
   shipment: Shipment;
   open: boolean;
   onClose: () => void;
+  onRequestEditQuantity: () => void;
 }) {
+  const needsQuantity = shipment.quantity == null;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +47,7 @@ export function MarkLandedModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (needsQuantity) return;
     const num = (v: string) => (v ? parseFloat(v) : null);
     startTransition(async () => {
       const result = await markShipmentLanded(shipment.id, {
@@ -96,6 +100,32 @@ export function MarkLandedModal({
             ✕
           </button>
         </header>
+
+        {needsQuantity && (
+          <div
+            className="mx-7 mt-5 p-3 rounded border text-[13px] flex items-start justify-between gap-3"
+            style={{
+              background: "var(--color-accent-soft)",
+              borderColor: "var(--color-accent)",
+              color: "var(--color-accent)",
+            }}
+          >
+            <div>
+              This shipment needs a landed quantity before it can be marked
+              as landed.
+            </div>
+            <button
+              type="button"
+              className="font-mono text-[11px] uppercase tracking-widest underline shrink-0"
+              onClick={() => {
+                onClose();
+                onRequestEditQuantity();
+              }}
+            >
+              Add quantity in Edit
+            </button>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="px-7 py-6 flex flex-col gap-4">
           <LandedField label="Actual landed date">
@@ -173,7 +203,7 @@ export function MarkLandedModal({
             <button
               type="submit"
               className="btn btn-primary"
-              disabled={isPending || !date}
+              disabled={isPending || !date || needsQuantity}
             >
               {isPending ? "Saving…" : "Mark as landed"}
             </button>

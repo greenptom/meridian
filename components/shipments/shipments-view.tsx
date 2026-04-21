@@ -30,6 +30,7 @@ export function ShipmentsView({
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Shipment | null>(null);
+  const [focusField, setFocusField] = useState<string | null>(null);
 
   const documentsByShipment = useMemo(() => {
     const map = new Map<string, ShipmentDocument[]>();
@@ -59,17 +60,20 @@ export function ShipmentsView({
 
   function openCreate() {
     setEditing(null);
+    setFocusField(null);
     setModalOpen(true);
   }
 
-  function openEdit(shipment: Shipment) {
+  function openEdit(shipment: Shipment, focus?: string) {
     setEditing(shipment);
+    setFocusField(focus ?? null);
     setModalOpen(true);
   }
 
   function closeModal() {
     setModalOpen(false);
     setEditing(null);
+    setFocusField(null);
   }
 
   return (
@@ -95,6 +99,7 @@ export function ShipmentsView({
         incoterms={incoterms}
         commodityCodes={commodityCodes}
         editingShipment={editing}
+        focusField={focusField}
       />
     </>
   );

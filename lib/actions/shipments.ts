@@ -82,6 +82,20 @@ function diffInput(
   return changes;
 }
 
+function friendlyDbError(error: {
+  code?: string;
+  message?: string;
+}): string {
+  if (
+    error?.code === "23514" &&
+    typeof error.message === "string" &&
+    error.message.includes("shipments_landed_requires_quantity")
+  ) {
+    return "Quantity must be set before a shipment can be marked as landed.";
+  }
+  return error?.message ?? "Unknown error";
+}
+
 function summariseChanges(
   changes: Record<string, ShipmentEventChange>,
 ): string {
@@ -195,7 +209,7 @@ export async function updateShipment(
     .from("shipments")
     .update({ ...input, status: nextStatus })
     .eq("id", id);
-  if (updateError) return { ok: false, error: updateError.message };
+  if (updateError) return { ok: false, error: friendlyDbError(updateError) };
 
   type EventInsert = {
     shipment_id: string;
@@ -311,7 +325,7 @@ export async function markShipmentLanded(
     .from("shipments")
     .update(landingUpdate)
     .eq("id", id);
-  if (updateError) return { ok: false, error: updateError.message };
+  if (updateError) return { ok: false, error: friendlyDbError(updateError) };
 
   const totalLanded =
     current.invoice_value != null

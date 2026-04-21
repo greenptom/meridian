@@ -29,7 +29,7 @@ export function ShipmentsTable({
   shipments: Shipment[];
   documentsByShipment: Map<string, ShipmentDocument[]>;
   eventsByShipment: Map<string, ShipmentEvent[]>;
-  onEdit: (s: Shipment) => void;
+  onEdit: (s: Shipment, focusField?: string) => void;
   hideFilters?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(shipments[0]?.id ?? null);
@@ -172,7 +172,7 @@ export function ShipmentsTable({
           shipment={selected}
           documents={documentsByShipment.get(selected.id) ?? []}
           events={eventsByShipment.get(selected.id) ?? []}
-          onEdit={() => onEdit(selected)}
+          onEdit={(focus) => onEdit(selected, focus)}
         />
       )}
     </div>

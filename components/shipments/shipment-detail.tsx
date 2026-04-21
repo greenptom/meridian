@@ -41,7 +41,7 @@ export function ShipmentDetail({
   shipment: Shipment;
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
-  onEdit: () => void;
+  onEdit: (focusField?: string) => void;
 }) {
   const [landedOpen, setLandedOpen] = useState(false);
   const canMarkLanded = s.status === "active" && !s.actual_landed_date;
@@ -73,7 +73,7 @@ export function ShipmentDetail({
               </button>
             )}
             <button
-              onClick={onEdit}
+              onClick={() => onEdit()}
               className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded border hover:bg-[color:var(--color-paper-warm)]"
               style={{ borderColor: "var(--color-line)" }}
             >
@@ -148,6 +148,7 @@ export function ShipmentDetail({
         shipment={s}
         open={landedOpen}
         onClose={() => setLandedOpen(false)}
+        onRequestEditQuantity={() => onEdit("quantity")}
       />
     </aside>
   );

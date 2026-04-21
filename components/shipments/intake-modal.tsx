@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useTransition, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   createShipment,
@@ -201,12 +201,14 @@ export function IntakeModal({
   incoterms,
   commodityCodes,
   editingShipment = null,
+  focusField = null,
 }: {
   open: boolean;
   onClose: () => void;
   incoterms: Incoterm[];
   commodityCodes: CommodityCode[];
   editingShipment?: Shipment | null;
+  focusField?: string | null;
 }) {
   const isEditing = !!editingShipment;
   const router = useRouter();
@@ -221,6 +223,17 @@ export function IntakeModal({
   >({});
   const [upload, setUpload] = useState<UploadState>({ phase: "idle" });
   const [documentId, setDocumentId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !focusField) return;
+    const el = document.getElementById(`intake-field-${focusField}`);
+    if (el instanceof HTMLElement) {
+      requestAnimationFrame(() => {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus({ preventScroll: true });
+      });
+    }
+  }, [open, focusField]);
 
   function resetAll() {
     setForm(formFromShipment(editingShipment));
@@ -360,6 +373,17 @@ export function IntakeModal({
     e.preventDefault();
     setError(null);
     const input = toShipmentInput(form);
+    if (input.actual_landed_date && input.quantity == null) {
+      setError(
+        "Quantity is required before a shipment can be marked as landed.",
+      );
+      const qtyEl = document.getElementById("intake-field-quantity");
+      if (qtyEl instanceof HTMLElement) {
+        qtyEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        qtyEl.focus({ preventScroll: true });
+      }
+      return;
+    }
     startTransition(async () => {
       if (editingShipment) {
         const result = await updateShipment(
@@ -697,6 +721,7 @@ export function IntakeModal({
                   confidence={autoFilled.quantity}
                 >
                   <input
+                    id="intake-field-quantity"
                     className={inputClass(autoFilled.quantity)}
                     type="number"
                     step="0.001"
