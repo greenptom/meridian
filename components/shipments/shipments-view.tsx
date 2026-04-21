@@ -89,6 +89,7 @@ export function ShipmentsView({
         hideFilters={headerVariant === "drafts"}
       />
       <IntakeModal
+        key={editing?.id ?? "new"}
         open={modalOpen}
         onClose={closeModal}
         incoterms={incoterms}

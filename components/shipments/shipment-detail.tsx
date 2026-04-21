@@ -1,21 +1,15 @@
 "use client";
 
-import {
-  useEffect,
-  useOptimistic,
-  useState,
-  useTransition,
-} from "react";
+import { useState } from "react";
 import type {
   Shipment,
   ShipmentDocument,
   ShipmentEvent,
   ShipmentStatus,
 } from "@/lib/types";
-import { updateShipmentStatus } from "@/lib/actions/shipments";
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
-import { formatCurrency, formatDate, formatDateShort } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { formatCurrency } from "@/lib/utils";
+import { ClientTime } from "@/components/ui/client-time";
 
 const statusLabel: Record<ShipmentStatus, string> = {
   active: "Active",
@@ -24,14 +18,6 @@ const statusLabel: Record<ShipmentStatus, string> = {
   alert: "Flag",
   archived: "Archived",
 };
-
-const STATUS_OPTIONS: ShipmentStatus[] = [
-  "draft",
-  "active",
-  "review",
-  "alert",
-  "archived",
-];
 
 const EVENT_LABEL: Record<ShipmentEvent["type"], string> = {
   created: "Shipment created",
@@ -64,7 +50,7 @@ export function ShipmentDetail({
       >
         <div className="flex justify-between items-start gap-3">
           <div className="font-mono text-[11px] text-[color:var(--color-ink-faint)] tracking-wider">
-            {s.ref} · {formatDate(s.created_at)}
+            {s.ref} · <ClientTime iso={s.created_at} mode="date" />
           </div>
           <button
             onClick={onEdit}
@@ -80,7 +66,9 @@ export function ShipmentDetail({
           <span className="text-[color:var(--color-ink-soft)]">→ {s.destination_country ?? "Unknown"}</span>
         </div>
         <div className="flex gap-2 mt-2.5 items-center flex-wrap">
-          <StatusControl shipmentId={s.id} status={s.status} />
+          <span className={`status status-${s.status}`}>
+            {statusLabel[s.status] ?? s.status}
+          </span>
           {s.incoterm && <span className="incoterm">{s.incoterm}</span>}
         </div>
       </header>
@@ -131,100 +119,6 @@ export function ShipmentDetail({
         <ActivityList shipment={s} events={events} />
       </Section>
     </aside>
-  );
-}
-
-function StatusControl({
-  shipmentId,
-  status,
-}: {
-  shipmentId: string;
-  status: ShipmentStatus;
-}) {
-  const router = useRouter();
-  const [optimisticStatus, setOptimisticStatus] = useOptimistic(status);
-  const [isPending, startTransition] = useTransition();
-  const [flash, setFlash] = useState<
-    { kind: "saved" } | { kind: "error"; message: string } | null
-  >(null);
-
-  useEffect(() => {
-    if (!flash) return;
-    const duration = flash.kind === "saved" ? 2000 : 4000;
-    const t = setTimeout(() => setFlash(null), duration);
-    return () => clearTimeout(t);
-  }, [flash]);
-
-  function handleChange(next: ShipmentStatus) {
-    if (next === optimisticStatus) return;
-    setFlash(null);
-    startTransition(async () => {
-      setOptimisticStatus(next);
-      const result = await updateShipmentStatus(shipmentId, next);
-      if (result.ok) {
-        setFlash({ kind: "saved" });
-        router.refresh();
-      } else {
-        setFlash({ kind: "error", message: result.error });
-      }
-    });
-  }
-
-  return (
-    <div className="flex items-center gap-2 flex-wrap">
-      <label className="relative inline-flex">
-        <span className={`status status-${optimisticStatus} cursor-pointer pr-5`}>
-          {statusLabel[optimisticStatus]}
-          <span
-            aria-hidden
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] opacity-60"
-          >
-            ▾
-          </span>
-        </span>
-        <select
-          className="absolute inset-0 opacity-0 cursor-pointer"
-          value={optimisticStatus}
-          disabled={isPending}
-          onChange={(e) => handleChange(e.target.value as ShipmentStatus)}
-          aria-label="Change status"
-        >
-          {STATUS_OPTIONS.map((s) => (
-            <option key={s} value={s}>
-              {statusLabel[s]}
-            </option>
-          ))}
-        </select>
-      </label>
-      {isPending && (
-        <span className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--color-ink-faint)]">
-          Saving…
-        </span>
-      )}
-      {flash?.kind === "saved" && !isPending && (
-        <span
-          className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded"
-          style={{
-            background: "var(--color-ok-soft)",
-            color: "var(--color-ok)",
-          }}
-        >
-          Saved
-        </span>
-      )}
-      {flash?.kind === "error" && !isPending && (
-        <span
-          className="font-mono text-[10px] uppercase tracking-widest px-1.5 py-0.5 rounded"
-          style={{
-            background: "var(--color-accent-soft)",
-            color: "var(--color-accent)",
-          }}
-          title={flash.message}
-        >
-          Save failed
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -283,7 +177,7 @@ function DocumentRow({ document: d }: { document: ShipmentDocument }) {
           {d.filename ?? "Untitled document"}
         </div>
         <div className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--color-ink-faint)] mt-0.5">
-          {formatDateShort(d.created_at)}
+          <ClientTime iso={d.created_at} mode="dateShort" />
           {confidencePct && <> · {confidencePct} confidence</>}
         </div>
         {error && (
@@ -319,7 +213,7 @@ function ActivityList({
       <div className="flex flex-col gap-3.5">
         <Event
           title="Shipment created"
-          meta={`${formatDateShort(shipment.created_at)} · ${formatTime(shipment.created_at)}`}
+          metaIso={shipment.created_at}
           current
         />
       </div>
@@ -332,19 +226,12 @@ function ActivityList({
         <Event
           key={e.id}
           title={e.summary ?? EVENT_LABEL[e.type]}
-          meta={`${formatDateShort(e.created_at)} · ${formatTime(e.created_at)}`}
+          metaIso={e.created_at}
           current={i === 0}
         />
       ))}
     </div>
   );
-}
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
@@ -380,7 +267,15 @@ function Field({
   );
 }
 
-function Event({ title, meta, current = false }: { title: string; meta: string; current?: boolean }) {
+function Event({
+  title,
+  metaIso,
+  current = false,
+}: {
+  title: string;
+  metaIso: string;
+  current?: boolean;
+}) {
   return (
     <div className="flex gap-3 relative">
       <div
@@ -392,7 +287,10 @@ function Event({ title, meta, current = false }: { title: string; meta: string; 
       />
       <div className="flex-1">
         <div className="text-[12.5px] font-medium">{title}</div>
-        <div className="text-[11px] font-mono text-[color:var(--color-ink-faint)] mt-0.5">{meta}</div>
+        <div className="text-[11px] font-mono text-[color:var(--color-ink-faint)] mt-0.5">
+          <ClientTime iso={metaIso} mode="dateShort" /> ·{" "}
+          <ClientTime iso={metaIso} mode="time" />
+        </div>
       </div>
     </div>
   );

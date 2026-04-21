@@ -14,6 +14,7 @@ export function ShipmentsPageHeader({
   const monthLabel = new Date().toLocaleDateString("en-GB", {
     month: "long",
     year: "numeric",
+    timeZone: "UTC",
   });
 
   const isDrafts = variant === "drafts";

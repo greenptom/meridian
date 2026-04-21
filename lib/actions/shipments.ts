@@ -118,6 +118,7 @@ export async function createShipment(
 export async function updateShipment(
   id: string,
   input: ShipmentInput,
+  nextStatus: ShipmentStatus,
 ): Promise<ActionResult> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -126,7 +127,7 @@ export async function updateShipment(
   const { data: current, error: fetchError } = await supabase
     .from("shipments")
     .select(
-      "origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, invoice_value, currency, ior_name, reason",
+      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, invoice_value, currency, ior_name, reason",
     )
     .eq("id", id)
     .single();
@@ -134,81 +135,66 @@ export async function updateShipment(
     return { ok: false, error: fetchError?.message ?? "Shipment not found" };
   }
 
-  let product_type = input.product_type;
-  if (input.commodity_code && input.commodity_code !== current.commodity_code) {
-    const { data: cc } = await supabase
-      .from("commodity_codes")
-      .select("product_type")
-      .eq("code", input.commodity_code)
-      .single();
-    product_type = cc?.product_type ?? input.product_type ?? current.product_type;
-  } else if (product_type === null) {
-    product_type = current.product_type;
-  }
+  const currentInput: ShipmentInput = {
+    origin_country: current.origin_country,
+    destination_country: current.destination_country,
+    supplier_name: current.supplier_name,
+    haulier_name: current.haulier_name,
+    incoterm: current.incoterm,
+    commodity_code: current.commodity_code,
+    product_type: current.product_type,
+    invoice_value: current.invoice_value,
+    currency: current.currency,
+    ior_name: current.ior_name,
+    reason: current.reason,
+  };
 
-  const nextInput: ShipmentInput = { ...input, product_type };
-  const changes = diffInput(current as ShipmentInput, nextInput);
+  const changes = diffInput(currentInput, input);
+  const statusChanged = current.status !== nextStatus;
 
-  if (Object.keys(changes).length === 0) {
+  if (Object.keys(changes).length === 0 && !statusChanged) {
     return { ok: true, data: undefined };
   }
 
   const { error: updateError } = await supabase
     .from("shipments")
-    .update(nextInput)
+    .update({ ...input, status: nextStatus })
     .eq("id", id);
   if (updateError) return { ok: false, error: updateError.message };
 
-  await supabase.from("shipment_events").insert({
-    shipment_id: id,
-    type: "updated",
-    summary: summariseChanges(changes),
-    changes,
-    created_by: user.id,
-  });
+  const eventsToInsert: Array<{
+    shipment_id: string;
+    type: "status_changed" | "updated";
+    summary: string;
+    changes: Record<string, ShipmentEventChange>;
+    created_by: string;
+  }> = [];
 
-  revalidatePath("/shipments");
-  revalidatePath("/drafts");
-  return { ok: true, data: undefined };
-}
-
-export async function updateShipmentStatus(
-  id: string,
-  status: ShipmentStatus,
-): Promise<ActionResult> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Not authenticated" };
-
-  const { data: current, error: fetchError } = await supabase
-    .from("shipments")
-    .select("status")
-    .eq("id", id)
-    .single();
-  if (fetchError || !current) {
-    return { ok: false, error: fetchError?.message ?? "Shipment not found" };
+  if (statusChanged) {
+    const fromLabel = STATUS_LABELS[current.status] ?? current.status;
+    const toLabel = STATUS_LABELS[nextStatus] ?? nextStatus;
+    eventsToInsert.push({
+      shipment_id: id,
+      type: "status_changed",
+      summary: `Status: ${fromLabel} → ${toLabel}`,
+      changes: { status: { from: current.status, to: nextStatus } },
+      created_by: user.id,
+    });
   }
 
-  if (current.status === status) {
-    return { ok: true, data: undefined };
+  if (Object.keys(changes).length > 0) {
+    eventsToInsert.push({
+      shipment_id: id,
+      type: "updated",
+      summary: summariseChanges(changes),
+      changes,
+      created_by: user.id,
+    });
   }
 
-  const { error } = await supabase
-    .from("shipments")
-    .update({ status })
-    .eq("id", id);
-  if (error) return { ok: false, error: error.message };
-
-  const fromLabel = STATUS_LABELS[current.status] ?? current.status;
-  const toLabel = STATUS_LABELS[status] ?? status;
-
-  await supabase.from("shipment_events").insert({
-    shipment_id: id,
-    type: "status_changed",
-    summary: `Status: ${fromLabel} → ${toLabel}`,
-    changes: { status: { from: current.status, to: status } },
-    created_by: user.id,
-  });
+  if (eventsToInsert.length > 0) {
+    await supabase.from("shipment_events").insert(eventsToInsert);
+  }
 
   revalidatePath("/shipments");
   revalidatePath("/drafts");

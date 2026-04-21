@@ -9,7 +9,20 @@ import {
 } from "@/lib/actions/shipments";
 import { linkDocumentToShipment } from "@/lib/actions/documents";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
-import type { Incoterm, CommodityCode, Shipment } from "@/lib/types";
+import type {
+  Incoterm,
+  CommodityCode,
+  Shipment,
+  ShipmentStatus,
+} from "@/lib/types";
+
+const STATUS_OPTIONS: { value: ShipmentStatus; label: string }[] = [
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "review", label: "Review" },
+  { value: "alert", label: "Flag" },
+  { value: "archived", label: "Archived" },
+];
 import type {
   ExtractedShipment,
   ExtractedFieldName,
@@ -22,10 +35,12 @@ type FormState = {
   haulier_name: string;
   incoterm: string;
   commodity_code: string;
+  product_type: string;
   invoice_value: string;
   currency: string;
   ior_name: string;
   reason: string;
+  status: ShipmentStatus;
 };
 
 const INITIAL_FORM: FormState = {
@@ -35,10 +50,12 @@ const INITIAL_FORM: FormState = {
   haulier_name: "",
   incoterm: "",
   commodity_code: "",
+  product_type: "",
   invoice_value: "",
   currency: "GBP",
   ior_name: "",
   reason: "",
+  status: "draft",
 };
 
 function formFromShipment(s: Shipment | null | undefined): FormState {
@@ -50,10 +67,12 @@ function formFromShipment(s: Shipment | null | undefined): FormState {
     haulier_name: s.haulier_name ?? "",
     incoterm: s.incoterm ?? "",
     commodity_code: s.commodity_code ?? "",
+    product_type: s.product_type ?? "",
     invoice_value: s.invoice_value != null ? String(s.invoice_value) : "",
     currency: s.currency ?? "GBP",
     ior_name: s.ior_name ?? "",
     reason: s.reason ?? "",
+    status: s.status,
   };
 }
 
@@ -65,7 +84,7 @@ function toShipmentInput(form: FormState): ShipmentInput {
     haulier_name: form.haulier_name || null,
     incoterm: form.incoterm || null,
     commodity_code: form.commodity_code || null,
-    product_type: null,
+    product_type: form.product_type || null,
     invoice_value: form.invoice_value ? parseFloat(form.invoice_value) : null,
     currency: form.currency || "GBP",
     ior_name: form.ior_name || null,
@@ -200,7 +219,7 @@ export function IntakeModal({
     const nextForm: FormState = { ...INITIAL_FORM };
     function take<K extends ExtractedFieldName>(
       key: K,
-      formKey: keyof FormState,
+      formKey: Exclude<keyof FormState, "status">,
       stringify: (v: NonNullable<ExtractedShipment[K]["value"]>) => string,
     ) {
       const entry = e[key];
@@ -235,7 +254,11 @@ export function IntakeModal({
     const input = toShipmentInput(form);
     startTransition(async () => {
       if (editingShipment) {
-        const result = await updateShipment(editingShipment.id, input);
+        const result = await updateShipment(
+          editingShipment.id,
+          input,
+          form.status,
+        );
         if (!result.ok) {
           setError(result.error);
           return;
@@ -370,6 +393,23 @@ export function IntakeModal({
               )}
 
               <div className="grid grid-cols-2 gap-4 gap-y-3.5">
+                {isEditing && (
+                  <FormField label="Status" className="col-span-2">
+                    <select
+                      className="form-input"
+                      value={form.status}
+                      onChange={(e) =>
+                        update("status", e.target.value as ShipmentStatus)
+                      }
+                    >
+                      {STATUS_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                )}
                 <FormField
                   label="Origin country"
                   confidence={autoFilled.origin_country}
@@ -488,7 +528,29 @@ export function IntakeModal({
                     onChange={(e) => update("ior_name", e.target.value)}
                   />
                 </FormField>
-                <FormField label="" className="col-span-1" />
+                {isEditing ? (
+                  <FormField label="Product">
+                    <input
+                      type="text"
+                      list="product-types-list"
+                      className="form-input"
+                      placeholder="e.g. Coffee (green)"
+                      value={form.product_type}
+                      onChange={(e) => update("product_type", e.target.value)}
+                    />
+                    <datalist id="product-types-list">
+                      {Array.from(
+                        new Set(commodityCodes.map((c) => c.product_type)),
+                      )
+                        .sort()
+                        .map((p) => (
+                          <option key={p} value={p} />
+                        ))}
+                    </datalist>
+                  </FormField>
+                ) : (
+                  <FormField label="" className="col-span-1" />
+                )}
                 <FormField
                   label="Reason for movement"
                   confidence={autoFilled.reason}

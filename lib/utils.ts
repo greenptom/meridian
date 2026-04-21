@@ -19,19 +19,3 @@ export function formatCurrency(value: number | null, currency: string | null) {
   }
 }
 
-export function formatDate(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-export function formatDateShort(iso: string | null) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-  }).toUpperCase();
-}
