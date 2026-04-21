@@ -126,6 +126,23 @@ create trigger shipment_batch_uses_unit_match
   before insert or update on shipment_batch_uses
   for each row execute function enforce_shipment_batch_use_unit();
 
+-- ---------- batches updated_at ----------
+-- Keep batches.updated_at current on any update. Matches the pattern
+-- already in place on shipments via set_shipment_ref.
+
+create or replace function set_batches_updated_at()
+returns trigger as $$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists batches_set_updated_at on batches;
+create trigger batches_set_updated_at
+  before update on batches
+  for each row execute function set_batches_updated_at();
+
 -- ---------- helpers ----------
 
 create or replace function shipment_remaining_quantity(p_shipment_id uuid)
