@@ -63,3 +63,38 @@ export interface Haulier {
   applicable_products: string | null;
   typical_incoterms: string | null;
 }
+
+export interface ShipmentDocument {
+  id: string;
+  shipment_id: string | null;
+  storage_path: string;
+  filename: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  extraction_confidence: number | null;
+  extracted_at: string | null;
+  created_at: string;
+}
+
+export type ShipmentEventType =
+  | "created"
+  | "updated"
+  | "status_changed"
+  | "document_attached"
+  | "document_extracted"
+  | "note_added";
+
+export interface ShipmentEventChange {
+  from: unknown;
+  to: unknown;
+}
+
+export interface ShipmentEvent {
+  id: string;
+  shipment_id: string;
+  type: ShipmentEventType;
+  summary: string | null;
+  changes: Record<string, ShipmentEventChange> | null;
+  created_by: string | null;
+  created_at: string;
+}
