@@ -148,9 +148,16 @@ export function ShipmentsTable({
                     {s.incoterm && <span className="incoterm">{s.incoterm}</span>}
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className={`status status-${s.status}`}>
-                      {statusLabel[s.status] ?? s.status}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`status status-${s.status}`}>
+                        {statusLabel[s.status] ?? s.status}
+                      </span>
+                      {s.actual_landed_date && (
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-[color:var(--color-ink-faint)]">
+                          landed
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

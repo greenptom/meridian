@@ -15,5 +15,8 @@ Field guidance:
 - invoice_value: numeric total of the commercial invoice, excluding currency symbol. If multiple totals are present, prefer the invoice total / grand total.
 - currency: 3-letter ISO code (GBP, EUR, USD, etc.). Infer from currency symbols if needed.
 - reason: short phrase describing why the goods are moving (e.g. "Import for UK roasting", "Sample for quality review", "Return to supplier"). Leave null if not stated.
+- po_number: purchase-order reference. Look for labels like "PO", "PO Number", "Purchase Order", "P/O", "Order #", "Order No.", "Customer Reference", "Your Reference". Commercial invoices usually reference the buyer's PO. Preserve the exact string (letters, numbers, dashes). Leave null if absent.
+- quantity: total net quantity of the shipment as a number, no unit. If the document says "25 bags × 60 kg", compute the net (1500). If multiple line items, sum to the total where it makes sense. Prefer a "total quantity" or "net weight" line if present. Leave null if you cannot determine a single net total.
+- quantity_unit: exactly one of "kg", "g", "lb", "units", "pallets", "containers". Map common variants (kilograms → kg, pounds → lb, pcs/pieces → units, skids → pallets, TEU/FEU → containers). If the quantity is a net weight, use the matching weight unit. Leave null if you cannot map with confidence.
 
 Never invent values. If a field is absent, return null with low confidence. Use the record_shipment_extraction tool to return your answer.`;

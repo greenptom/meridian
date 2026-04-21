@@ -7,6 +7,20 @@ export type FlagCode =
   | "MISSING_INVOICE_VALUE"
   | "MISSING_IOR";
 
+export type QuantityUnit =
+  | "kg"
+  | "g"
+  | "lb"
+  | "units"
+  | "pallets"
+  | "containers";
+
+export type CustomsStatus =
+  | "not_started"
+  | "in_progress"
+  | "cleared"
+  | "held";
+
 export interface Shipment {
   id: string;
   ref: string;
@@ -26,6 +40,16 @@ export interface Shipment {
   reason: string | null;
   status: ShipmentStatus;
   flags: FlagCode[];
+  po_number: string | null;
+  quantity: number | null;
+  quantity_unit: QuantityUnit | null;
+  expected_landed_date: string | null;
+  actual_landed_date: string | null;
+  customs_status: CustomsStatus | null;
+  freight_cost: number | null;
+  insurance_cost: number | null;
+  duty_cost: number | null;
+  other_costs: number | null;
   created_by: string;
   created_at: string;
   updated_at: string;

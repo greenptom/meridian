@@ -86,6 +86,10 @@ export function ShipmentDetail({
         </div>
       </Section>
 
+      <Section label="Landing & costs">
+        <LandingAndCosts shipment={s} />
+      </Section>
+
       {s.reason && (
         <Section label="Reason">
           <div className="text-[13px] leading-relaxed">{s.reason}</div>
@@ -120,6 +124,105 @@ export function ShipmentDetail({
       </Section>
     </aside>
   );
+}
+
+const CUSTOMS_LABEL: Record<string, string> = {
+  not_started: "Not started",
+  in_progress: "In progress",
+  cleared: "Cleared",
+  held: "Held",
+};
+
+function LandingAndCosts({ shipment: s }: { shipment: Shipment }) {
+  const { totalLanded, perUnit } = computeLandedCost(s);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-x-5 gap-y-3.5">
+        <Field label="PO number" value={s.po_number} mono />
+        <Field
+          label="Quantity"
+          value={
+            s.quantity != null
+              ? `${s.quantity}${s.quantity_unit ? ` ${s.quantity_unit}` : ""}`
+              : null
+          }
+        />
+        <Field label="Expected landed" value={formatDateOnly(s.expected_landed_date)} />
+        <Field label="Actual landed" value={formatDateOnly(s.actual_landed_date)} />
+        <Field
+          label="Customs"
+          value={s.customs_status ? CUSTOMS_LABEL[s.customs_status] : null}
+        />
+        <Field
+          label="Freight"
+          value={formatCurrency(s.freight_cost, s.currency)}
+        />
+        <Field
+          label="Insurance"
+          value={formatCurrency(s.insurance_cost, s.currency)}
+        />
+        <Field label="Duty" value={formatCurrency(s.duty_cost, s.currency)} />
+        <Field
+          label="Other"
+          value={formatCurrency(s.other_costs, s.currency)}
+        />
+      </div>
+      {(totalLanded !== null || perUnit !== null) && (
+        <div
+          className="mt-4 pt-3 border-t flex flex-col gap-1.5"
+          style={{ borderColor: "var(--color-line-soft)" }}
+        >
+          {totalLanded !== null && (
+            <div className="flex justify-between items-baseline">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--color-ink-faint)]">
+                Total landed
+              </span>
+              <span className="font-serif text-[16px]">
+                {formatCurrency(totalLanded, s.currency)}
+              </span>
+            </div>
+          )}
+          {perUnit !== null && (
+            <div className="flex justify-between items-baseline">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--color-ink-faint)]">
+                Per {s.quantity_unit}
+              </span>
+              <span className="font-mono text-[12px]">
+                {formatCurrency(perUnit, s.currency)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function computeLandedCost(s: Shipment): {
+  totalLanded: number | null;
+  perUnit: number | null;
+} {
+  if (s.invoice_value == null) return { totalLanded: null, perUnit: null };
+  const total =
+    s.invoice_value +
+    (s.freight_cost ?? 0) +
+    (s.insurance_cost ?? 0) +
+    (s.duty_cost ?? 0) +
+    (s.other_costs ?? 0);
+  const perUnit =
+    s.quantity && s.quantity > 0 ? total / s.quantity : null;
+  return { totalLanded: total, perUnit };
+}
+
+function formatDateOnly(iso: string | null): string | null {
+  if (!iso) return null;
+  return new Date(iso + "T00:00:00Z").toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 function DocumentsList({ documents }: { documents: ShipmentDocument[] }) {

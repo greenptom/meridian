@@ -13,6 +13,9 @@ export type ExtractedShipment = {
   invoice_value: ExtractedField<number>;
   currency: ExtractedField<string>;
   reason: ExtractedField<string>;
+  po_number: ExtractedField<string>;
+  quantity: ExtractedField<number>;
+  quantity_unit: ExtractedField<string>;
   notes: string | null;
 };
 
@@ -26,6 +29,9 @@ export const EXTRACTED_FIELDS = [
   "invoice_value",
   "currency",
   "reason",
+  "po_number",
+  "quantity",
+  "quantity_unit",
 ] as const;
 
 export type ExtractedFieldName = (typeof EXTRACTED_FIELDS)[number];
@@ -68,6 +74,9 @@ export const EXTRACT_TOOL_SCHEMA: Anthropic.Tool = {
       invoice_value: numberField,
       currency: stringField,
       reason: stringField,
+      po_number: stringField,
+      quantity: numberField,
+      quantity_unit: stringField,
       notes: { type: ["string", "null"] },
     },
     required: [
@@ -80,6 +89,9 @@ export const EXTRACT_TOOL_SCHEMA: Anthropic.Tool = {
       "invoice_value",
       "currency",
       "reason",
+      "po_number",
+      "quantity",
+      "quantity_unit",
       "notes",
     ],
     additionalProperties: false,

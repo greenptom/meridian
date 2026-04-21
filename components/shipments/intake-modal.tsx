@@ -14,6 +14,8 @@ import type {
   CommodityCode,
   Shipment,
   ShipmentStatus,
+  QuantityUnit,
+  CustomsStatus,
 } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: ShipmentStatus; label: string }[] = [
@@ -23,6 +25,55 @@ const STATUS_OPTIONS: { value: ShipmentStatus; label: string }[] = [
   { value: "alert", label: "Flag" },
   { value: "archived", label: "Archived" },
 ];
+
+const QUANTITY_UNITS: QuantityUnit[] = [
+  "kg",
+  "g",
+  "lb",
+  "units",
+  "pallets",
+  "containers",
+];
+
+const CUSTOMS_STATUS_OPTIONS: { value: CustomsStatus; label: string }[] = [
+  { value: "not_started", label: "Not started" },
+  { value: "in_progress", label: "In progress" },
+  { value: "cleared", label: "Cleared" },
+  { value: "held", label: "Held" },
+];
+
+function normaliseQuantityUnit(raw: string): QuantityUnit | "" {
+  const s = raw.trim().toLowerCase();
+  if (!s) return "";
+  const map: Record<string, QuantityUnit> = {
+    kg: "kg",
+    kgs: "kg",
+    kilogram: "kg",
+    kilograms: "kg",
+    g: "g",
+    gram: "g",
+    grams: "g",
+    lb: "lb",
+    lbs: "lb",
+    pound: "lb",
+    pounds: "lb",
+    unit: "units",
+    units: "units",
+    pc: "units",
+    pcs: "units",
+    piece: "units",
+    pieces: "units",
+    pallet: "pallets",
+    pallets: "pallets",
+    skid: "pallets",
+    skids: "pallets",
+    container: "containers",
+    containers: "containers",
+    teu: "containers",
+    feu: "containers",
+  };
+  return map[s] ?? "";
+}
 import type {
   ExtractedShipment,
   ExtractedFieldName,
@@ -41,6 +92,16 @@ type FormState = {
   ior_name: string;
   reason: string;
   status: ShipmentStatus;
+  po_number: string;
+  quantity: string;
+  quantity_unit: QuantityUnit | "";
+  expected_landed_date: string;
+  actual_landed_date: string;
+  customs_status: CustomsStatus | "";
+  freight_cost: string;
+  insurance_cost: string;
+  duty_cost: string;
+  other_costs: string;
 };
 
 const INITIAL_FORM: FormState = {
@@ -56,6 +117,16 @@ const INITIAL_FORM: FormState = {
   ior_name: "",
   reason: "",
   status: "draft",
+  po_number: "",
+  quantity: "",
+  quantity_unit: "",
+  expected_landed_date: "",
+  actual_landed_date: "",
+  customs_status: "",
+  freight_cost: "",
+  insurance_cost: "",
+  duty_cost: "",
+  other_costs: "",
 };
 
 function formFromShipment(s: Shipment | null | undefined): FormState {
@@ -73,10 +144,22 @@ function formFromShipment(s: Shipment | null | undefined): FormState {
     ior_name: s.ior_name ?? "",
     reason: s.reason ?? "",
     status: s.status,
+    po_number: s.po_number ?? "",
+    quantity: s.quantity != null ? String(s.quantity) : "",
+    quantity_unit: s.quantity_unit ?? "",
+    expected_landed_date: s.expected_landed_date ?? "",
+    actual_landed_date: s.actual_landed_date ?? "",
+    customs_status: s.customs_status ?? "",
+    freight_cost: s.freight_cost != null ? String(s.freight_cost) : "",
+    insurance_cost:
+      s.insurance_cost != null ? String(s.insurance_cost) : "",
+    duty_cost: s.duty_cost != null ? String(s.duty_cost) : "",
+    other_costs: s.other_costs != null ? String(s.other_costs) : "",
   };
 }
 
 function toShipmentInput(form: FormState): ShipmentInput {
+  const num = (v: string) => (v ? parseFloat(v) : null);
   return {
     origin_country: form.origin_country || null,
     destination_country: form.destination_country || null,
@@ -85,10 +168,20 @@ function toShipmentInput(form: FormState): ShipmentInput {
     incoterm: form.incoterm || null,
     commodity_code: form.commodity_code || null,
     product_type: form.product_type || null,
-    invoice_value: form.invoice_value ? parseFloat(form.invoice_value) : null,
+    invoice_value: num(form.invoice_value),
     currency: form.currency || "GBP",
     ior_name: form.ior_name || null,
     reason: form.reason || null,
+    po_number: form.po_number || null,
+    quantity: num(form.quantity),
+    quantity_unit: form.quantity_unit || null,
+    expected_landed_date: form.expected_landed_date || null,
+    actual_landed_date: form.actual_landed_date || null,
+    customs_status: form.customs_status || null,
+    freight_cost: num(form.freight_cost),
+    insurance_cost: num(form.insurance_cost),
+    duty_cost: num(form.duty_cost),
+    other_costs: num(form.other_costs),
   };
 }
 
@@ -217,9 +310,13 @@ export function IntakeModal({
     const e = payload.extracted;
     const filled: Partial<Record<ExtractedFieldName, number>> = {};
     const nextForm: FormState = { ...INITIAL_FORM };
+    type StringFormField = Exclude<
+      keyof FormState,
+      "status" | "quantity_unit" | "customs_status"
+    >;
     function take<K extends ExtractedFieldName>(
       key: K,
-      formKey: Exclude<keyof FormState, "status">,
+      formKey: StringFormField,
       stringify: (v: NonNullable<ExtractedShipment[K]["value"]>) => string,
     ) {
       const entry = e[key];
@@ -239,6 +336,17 @@ export function IntakeModal({
     take("invoice_value", "invoice_value", (v) => String(v));
     take("currency", "currency", (v) => String(v).toUpperCase());
     take("reason", "reason", (v) => String(v));
+    take("po_number", "po_number", (v) => String(v));
+    take("quantity", "quantity", (v) => String(v));
+
+    const unitEntry = e.quantity_unit;
+    if (unitEntry.value !== null && unitEntry.value !== undefined) {
+      const normalised = normaliseQuantityUnit(String(unitEntry.value));
+      if (normalised) {
+        nextForm.quantity_unit = normalised;
+        filled.quantity_unit = unitEntry.confidence;
+      }
+    }
 
     if (!nextForm.currency) nextForm.currency = "GBP";
 
@@ -561,6 +669,146 @@ export function IntakeModal({
                     placeholder="e.g. Import for UK roasting"
                     value={form.reason}
                     onChange={(e) => update("reason", e.target.value)}
+                  />
+                </FormField>
+
+                <div
+                  className="col-span-2 pt-5 mt-2 border-t font-mono text-[10px] uppercase tracking-widest text-[color:var(--color-ink-faint)]"
+                  style={{ borderColor: "var(--color-line-soft)" }}
+                >
+                  Landing &amp; costs
+                </div>
+
+                <FormField
+                  label="PO number"
+                  confidence={autoFilled.po_number}
+                >
+                  <input
+                    className={inputClass(autoFilled.po_number)}
+                    placeholder="e.g. PO-2026-0412"
+                    value={form.po_number}
+                    onChange={(e) => update("po_number", e.target.value)}
+                  />
+                </FormField>
+                <FormField label="" className="col-span-1" />
+
+                <FormField
+                  label="Quantity"
+                  confidence={autoFilled.quantity}
+                >
+                  <input
+                    className={inputClass(autoFilled.quantity)}
+                    type="number"
+                    step="0.001"
+                    placeholder="0"
+                    value={form.quantity}
+                    onChange={(e) => update("quantity", e.target.value)}
+                  />
+                </FormField>
+                <FormField
+                  label="Quantity unit"
+                  confidence={autoFilled.quantity_unit}
+                >
+                  <select
+                    className={inputClass(autoFilled.quantity_unit)}
+                    value={form.quantity_unit}
+                    onChange={(e) =>
+                      update(
+                        "quantity_unit",
+                        e.target.value as QuantityUnit | "",
+                      )
+                    }
+                  >
+                    <option value="">— select —</option>
+                    {QUANTITY_UNITS.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <FormField label="Expected landed">
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={form.expected_landed_date}
+                    onChange={(e) =>
+                      update("expected_landed_date", e.target.value)
+                    }
+                  />
+                </FormField>
+                <FormField label="Actual landed">
+                  <input
+                    className="form-input"
+                    type="date"
+                    value={form.actual_landed_date}
+                    onChange={(e) =>
+                      update("actual_landed_date", e.target.value)
+                    }
+                  />
+                </FormField>
+
+                <FormField label="Customs status" className="col-span-2">
+                  <select
+                    className="form-input"
+                    value={form.customs_status}
+                    onChange={(e) =>
+                      update(
+                        "customs_status",
+                        e.target.value as CustomsStatus | "",
+                      )
+                    }
+                  >
+                    <option value="">— select —</option>
+                    {CUSTOMS_STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <FormField label={`Freight · ${form.currency}`}>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.freight_cost}
+                    onChange={(e) => update("freight_cost", e.target.value)}
+                  />
+                </FormField>
+                <FormField label={`Insurance · ${form.currency}`}>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.insurance_cost}
+                    onChange={(e) =>
+                      update("insurance_cost", e.target.value)
+                    }
+                  />
+                </FormField>
+                <FormField label={`Duty · ${form.currency}`}>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.duty_cost}
+                    onChange={(e) => update("duty_cost", e.target.value)}
+                  />
+                </FormField>
+                <FormField label={`Other · ${form.currency}`}>
+                  <input
+                    className="form-input"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.other_costs}
+                    onChange={(e) => update("other_costs", e.target.value)}
                   />
                 </FormField>
               </div>

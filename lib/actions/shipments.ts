@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { ShipmentEventChange, ShipmentStatus } from "@/lib/types";
+import type {
+  CustomsStatus,
+  QuantityUnit,
+  ShipmentEventChange,
+  ShipmentStatus,
+} from "@/lib/types";
 
 export type ShipmentInput = {
   origin_country: string | null;
@@ -16,6 +21,16 @@ export type ShipmentInput = {
   currency: string | null;
   ior_name: string | null;
   reason: string | null;
+  po_number: string | null;
+  quantity: number | null;
+  quantity_unit: QuantityUnit | null;
+  expected_landed_date: string | null;
+  actual_landed_date: string | null;
+  customs_status: CustomsStatus | null;
+  freight_cost: number | null;
+  insurance_cost: number | null;
+  duty_cost: number | null;
+  other_costs: number | null;
 };
 
 export type ActionResult<T = undefined> =
@@ -42,6 +57,16 @@ const FIELD_LABELS: Record<keyof ShipmentInput, string> = {
   currency: "Currency",
   ior_name: "IOR",
   reason: "Reason",
+  po_number: "PO number",
+  quantity: "Quantity",
+  quantity_unit: "Quantity unit",
+  expected_landed_date: "Expected landed",
+  actual_landed_date: "Actual landed",
+  customs_status: "Customs status",
+  freight_cost: "Freight",
+  insurance_cost: "Insurance",
+  duty_cost: "Duty",
+  other_costs: "Other costs",
 };
 
 function diffInput(
@@ -127,7 +152,7 @@ export async function updateShipment(
   const { data: current, error: fetchError } = await supabase
     .from("shipments")
     .select(
-      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, invoice_value, currency, ior_name, reason",
+      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, invoice_value, currency, ior_name, reason, po_number, quantity, quantity_unit, expected_landed_date, actual_landed_date, customs_status, freight_cost, insurance_cost, duty_cost, other_costs",
     )
     .eq("id", id)
     .single();
@@ -147,6 +172,16 @@ export async function updateShipment(
     currency: current.currency,
     ior_name: current.ior_name,
     reason: current.reason,
+    po_number: current.po_number,
+    quantity: current.quantity,
+    quantity_unit: current.quantity_unit,
+    expected_landed_date: current.expected_landed_date,
+    actual_landed_date: current.actual_landed_date,
+    customs_status: current.customs_status,
+    freight_cost: current.freight_cost,
+    insurance_cost: current.insurance_cost,
+    duty_cost: current.duty_cost,
+    other_costs: current.other_costs,
   };
 
   const changes = diffInput(currentInput, input);
