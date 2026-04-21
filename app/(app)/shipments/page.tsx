@@ -1,8 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
-import { KpiStrip } from "@/components/shipments/kpi-strip";
-import { ShipmentsTable } from "@/components/shipments/shipments-table";
-import { ShipmentsPageHeader } from "@/components/shipments/page-header";
-import type { Shipment, Incoterm, CommodityCode } from "@/lib/types";
+import { ShipmentsView } from "@/components/shipments/shipments-view";
+import type {
+  Shipment,
+  Incoterm,
+  CommodityCode,
+  ShipmentDocument,
+  ShipmentEvent,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -20,21 +24,33 @@ export default async function ShipmentsPage() {
   ]);
 
   const rows = (shipments ?? []) as Shipment[];
-  const activeCount = rows.filter((r) => r.status === "active").length;
-  const flaggedCount = rows.filter(
-    (r) => r.status === "alert" || (r.flags?.length ?? 0) > 0
-  ).length;
+  const ids = rows.map((r) => r.id);
+
+  const [{ data: documents }, { data: events }] =
+    ids.length === 0
+      ? [{ data: [] }, { data: [] }]
+      : await Promise.all([
+          supabase
+            .from("shipment_documents")
+            .select(
+              "id, shipment_id, storage_path, filename, mime_type, file_size, extraction_confidence, extracted_at, created_at",
+            )
+            .in("shipment_id", ids)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("shipment_events")
+            .select("*")
+            .in("shipment_id", ids)
+            .order("created_at", { ascending: false }),
+        ]);
 
   return (
-    <>
-      <ShipmentsPageHeader
-        activeCount={activeCount}
-        flaggedCount={flaggedCount}
-        incoterms={(incoterms ?? []) as Incoterm[]}
-        commodityCodes={(commodityCodes ?? []) as CommodityCode[]}
-      />
-      <KpiStrip shipments={rows} />
-      <ShipmentsTable shipments={rows} />
-    </>
+    <ShipmentsView
+      shipments={rows}
+      incoterms={(incoterms ?? []) as Incoterm[]}
+      commodityCodes={(commodityCodes ?? []) as CommodityCode[]}
+      documents={(documents ?? []) as ShipmentDocument[]}
+      events={(events ?? []) as ShipmentEvent[]}
+    />
   );
 }

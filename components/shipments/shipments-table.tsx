@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import type { Shipment } from "@/lib/types";
+import type {
+  Shipment,
+  ShipmentDocument,
+  ShipmentEvent,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ShipmentDetail } from "./shipment-detail";
 
@@ -15,7 +19,19 @@ const statusLabel: Record<string, string> = {
   archived: "Archived",
 };
 
-export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
+export function ShipmentsTable({
+  shipments,
+  documentsByShipment,
+  eventsByShipment,
+  onEdit,
+  hideFilters = false,
+}: {
+  shipments: Shipment[];
+  documentsByShipment: Map<string, ShipmentDocument[]>;
+  eventsByShipment: Map<string, ShipmentEvent[]>;
+  onEdit: (s: Shipment) => void;
+  hideFilters?: boolean;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(shipments[0]?.id ?? null);
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -24,7 +40,6 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
     if (filter === "flagged")
       return shipments.filter((s) => s.status === "alert" || s.status === "review");
     if (filter === "draft") return shipments.filter((s) => s.status === "draft");
-    // import/export are heuristic — destination-based filters can be refined later
     if (filter === "import")
       return shipments.filter((s) => s.destination_country === "United Kingdom");
     if (filter === "export")
@@ -51,28 +66,30 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
           </div>
         </div>
 
-        <div
-          className="flex gap-2 flex-wrap px-[22px] py-3 border-b"
-          style={{
-            background: "var(--color-paper-warm)",
-            borderColor: "var(--color-line-soft)",
-          }}
-        >
-          {(["all", "import", "export", "flagged", "draft"] as Filter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={cn(
-                "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide capitalize",
-                filter === f
-                  ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
-                  : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
-              )}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+        {!hideFilters && (
+          <div
+            className="flex gap-2 flex-wrap px-[22px] py-3 border-b"
+            style={{
+              background: "var(--color-paper-warm)",
+              borderColor: "var(--color-line-soft)",
+            }}
+          >
+            {(["all", "import", "export", "flagged", "draft"] as Filter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={cn(
+                  "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide capitalize",
+                  filter === f
+                    ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
+                    : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        )}
 
         {filtered.length === 0 ? (
           <div className="p-16 text-center">
@@ -142,7 +159,15 @@ export function ShipmentsTable({ shipments }: { shipments: Shipment[] }) {
         )}
       </section>
 
-      {selected && <ShipmentDetail shipment={selected} />}
+      {selected && (
+        <ShipmentDetail
+          key={selected.id}
+          shipment={selected}
+          documents={documentsByShipment.get(selected.id) ?? []}
+          events={eventsByShipment.get(selected.id) ?? []}
+          onEdit={() => onEdit(selected)}
+        />
+      )}
     </div>
   );
 }

@@ -2,10 +2,14 @@
 
 import { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { createShipment } from "@/lib/actions/shipments";
+import {
+  createShipment,
+  updateShipment,
+  type ShipmentInput,
+} from "@/lib/actions/shipments";
 import { linkDocumentToShipment } from "@/lib/actions/documents";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
-import type { Incoterm, CommodityCode } from "@/lib/types";
+import type { Incoterm, CommodityCode, Shipment } from "@/lib/types";
 import type {
   ExtractedShipment,
   ExtractedFieldName,
@@ -37,6 +41,38 @@ const INITIAL_FORM: FormState = {
   reason: "",
 };
 
+function formFromShipment(s: Shipment | null | undefined): FormState {
+  if (!s) return INITIAL_FORM;
+  return {
+    origin_country: s.origin_country ?? "",
+    destination_country: s.destination_country ?? "",
+    supplier_name: s.supplier_name ?? "",
+    haulier_name: s.haulier_name ?? "",
+    incoterm: s.incoterm ?? "",
+    commodity_code: s.commodity_code ?? "",
+    invoice_value: s.invoice_value != null ? String(s.invoice_value) : "",
+    currency: s.currency ?? "GBP",
+    ior_name: s.ior_name ?? "",
+    reason: s.reason ?? "",
+  };
+}
+
+function toShipmentInput(form: FormState): ShipmentInput {
+  return {
+    origin_country: form.origin_country || null,
+    destination_country: form.destination_country || null,
+    supplier_name: form.supplier_name || null,
+    haulier_name: form.haulier_name || null,
+    incoterm: form.incoterm || null,
+    commodity_code: form.commodity_code || null,
+    product_type: null,
+    invoice_value: form.invoice_value ? parseFloat(form.invoice_value) : null,
+    currency: form.currency || "GBP",
+    ior_name: form.ior_name || null,
+    reason: form.reason || null,
+  };
+}
+
 const ACCEPT =
   "application/pdf,image/png,image/jpeg,image/webp,image/gif";
 
@@ -52,17 +88,22 @@ export function IntakeModal({
   onClose,
   incoterms,
   commodityCodes,
+  editingShipment = null,
 }: {
   open: boolean;
   onClose: () => void;
   incoterms: Incoterm[];
   commodityCodes: CommodityCode[];
+  editingShipment?: Shipment | null;
 }) {
+  const isEditing = !!editingShipment;
   const router = useRouter();
-  const [tab, setTab] = useState<0 | 1 | 2>(0);
+  const [tab, setTab] = useState<0 | 1 | 2>(isEditing ? 2 : 0);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [form, setForm] = useState<FormState>(() =>
+    formFromShipment(editingShipment),
+  );
   const [autoFilled, setAutoFilled] = useState<
     Partial<Record<ExtractedFieldName, number>>
   >({});
@@ -70,7 +111,7 @@ export function IntakeModal({
   const [documentId, setDocumentId] = useState<string | null>(null);
 
   function resetAll() {
-    setForm(INITIAL_FORM);
+    setForm(formFromShipment(editingShipment));
     setAutoFilled({});
     setUpload({ phase: "idle" });
     setDocumentId(null);
@@ -191,28 +232,23 @@ export function IntakeModal({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const input = toShipmentInput(form);
     startTransition(async () => {
-      const result = await createShipment({
-        origin_country: form.origin_country || null,
-        destination_country: form.destination_country || null,
-        supplier_name: form.supplier_name || null,
-        haulier_name: form.haulier_name || null,
-        incoterm: form.incoterm || null,
-        commodity_code: form.commodity_code || null,
-        product_type: null,
-        invoice_value: form.invoice_value
-          ? parseFloat(form.invoice_value)
-          : null,
-        currency: form.currency || "GBP",
-        ior_name: form.ior_name || null,
-        reason: form.reason || null,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      if (documentId) {
-        await linkDocumentToShipment(documentId, result.data.id);
+      if (editingShipment) {
+        const result = await updateShipment(editingShipment.id, input);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+      } else {
+        const result = await createShipment(input);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        if (documentId) {
+          await linkDocumentToShipment(documentId, result.data.id);
+        }
       }
       resetAll();
       router.refresh();
@@ -228,7 +264,7 @@ export function IntakeModal({
   if (!open) return null;
 
   const showForm =
-    tab === 2 || (tab === 0 && upload.phase === "done");
+    isEditing || tab === 2 || (tab === 0 && upload.phase === "done");
 
   return (
     <div
@@ -248,10 +284,20 @@ export function IntakeModal({
         >
           <div>
             <div className="font-serif text-[26px] font-normal tracking-tight">
-              Log a <em className="text-[color:var(--color-ink-soft)]">movement</em>
+              {isEditing ? (
+                <>
+                  Edit <em className="text-[color:var(--color-ink-soft)]">movement</em>
+                </>
+              ) : (
+                <>
+                  Log a <em className="text-[color:var(--color-ink-soft)]">movement</em>
+                </>
+              )}
             </div>
             <div className="font-mono text-[11px] text-[color:var(--color-ink-faint)] uppercase tracking-widest mt-1">
-              Three ways to get data in
+              {isEditing
+                ? `${editingShipment.ref}`
+                : "Three ways to get data in"}
             </div>
           </div>
           <button
@@ -264,26 +310,28 @@ export function IntakeModal({
         </header>
 
         <div className="overflow-y-auto flex-1 px-7 py-6">
-          <div
-            className="flex gap-1 p-1 rounded-lg border mb-5"
-            style={{
-              background: "var(--color-paper-warm)",
-              borderColor: "var(--color-line)",
-            }}
-          >
-            <TabButton active={tab === 0} onClick={() => setTab(0)}>
-              Upload document
-            </TabButton>
-            <TabButton active={tab === 1} onClick={() => setTab(1)} disabled>
-              Forward email
-              <span className="font-mono text-[9px] ml-1.5 opacity-60">PHASE 3</span>
-            </TabButton>
-            <TabButton active={tab === 2} onClick={() => setTab(2)}>
-              Manual entry
-            </TabButton>
-          </div>
+          {!isEditing && (
+            <div
+              className="flex gap-1 p-1 rounded-lg border mb-5"
+              style={{
+                background: "var(--color-paper-warm)",
+                borderColor: "var(--color-line)",
+              }}
+            >
+              <TabButton active={tab === 0} onClick={() => setTab(0)}>
+                Upload document
+              </TabButton>
+              <TabButton active={tab === 1} onClick={() => setTab(1)} disabled>
+                Forward email
+                <span className="font-mono text-[9px] ml-1.5 opacity-60">PHASE 3</span>
+              </TabButton>
+              <TabButton active={tab === 2} onClick={() => setTab(2)}>
+                Manual entry
+              </TabButton>
+            </div>
+          )}
 
-          {tab === 0 && upload.phase !== "done" && (
+          {!isEditing && tab === 0 && upload.phase !== "done" && (
             <Dropzone
               upload={upload}
               onFile={handleFile}
@@ -293,7 +341,7 @@ export function IntakeModal({
 
           {showForm && (
             <form id="intake-form" onSubmit={handleSubmit}>
-              {tab === 0 && upload.phase === "done" && (
+              {!isEditing && tab === 0 && upload.phase === "done" && (
                 <div
                   className="mb-5 flex items-center gap-3 p-3 rounded-md border"
                   style={{
@@ -478,9 +526,11 @@ export function IntakeModal({
           }}
         >
           <div className="text-[12px] text-[color:var(--color-ink-faint)]">
-            {showForm
-              ? "Saves as a draft you can review later."
-              : "Drop a PDF or image to auto-fill the form."}
+            {isEditing
+              ? "Changes are logged to the shipment's activity."
+              : showForm
+                ? "Saves as a draft you can review later."
+                : "Drop a PDF or image to auto-fill the form."}
           </div>
           <div className="flex gap-2.5">
             <button type="button" className="btn" onClick={handleClose}>
@@ -492,7 +542,11 @@ export function IntakeModal({
               className="btn btn-primary"
               disabled={isPending || !showForm}
             >
-              {isPending ? "Saving…" : "Save movement"}
+              {isPending
+                ? "Saving…"
+                : isEditing
+                  ? "Save changes"
+                  : "Save movement"}
             </button>
           </div>
         </footer>
