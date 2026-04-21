@@ -5,6 +5,7 @@ import type {
   Shipment,
   ShipmentDocument,
   ShipmentEvent,
+  ShipmentBatchUseWithBatch,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ShipmentDetail } from "./shipment-detail";
@@ -23,12 +24,14 @@ export function ShipmentsTable({
   shipments,
   documentsByShipment,
   eventsByShipment,
+  usesByShipment,
   onEdit,
   hideFilters = false,
 }: {
   shipments: Shipment[];
   documentsByShipment: Map<string, ShipmentDocument[]>;
   eventsByShipment: Map<string, ShipmentEvent[]>;
+  usesByShipment: Map<string, ShipmentBatchUseWithBatch[]>;
   onEdit: (s: Shipment, focusField?: string) => void;
   hideFilters?: boolean;
 }) {
@@ -172,6 +175,7 @@ export function ShipmentsTable({
           shipment={selected}
           documents={documentsByShipment.get(selected.id) ?? []}
           events={eventsByShipment.get(selected.id) ?? []}
+          uses={usesByShipment.get(selected.id) ?? []}
           onEdit={(focus) => onEdit(selected, focus)}
         />
       )}

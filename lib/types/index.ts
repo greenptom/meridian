@@ -160,3 +160,10 @@ export interface ShipmentBatchUse {
   organisation_id: string;
   created_at: string;
 }
+
+export type ShipmentBatchUseWithBatch = ShipmentBatchUse & {
+  batch: Pick<
+    Batch,
+    "id" | "batch_code" | "blend_name" | "roasted_date" | "quantity_unit"
+  > | null;
+};

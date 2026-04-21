@@ -6,6 +6,7 @@ import type {
   ShipmentDocument,
   ShipmentEvent,
   ShipmentStatus,
+  ShipmentBatchUseWithBatch,
 } from "@/lib/types";
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
 import { formatCurrency } from "@/lib/utils";
@@ -38,11 +39,13 @@ export function ShipmentDetail({
   shipment: s,
   documents,
   events,
+  uses: _uses,
   onEdit,
 }: {
   shipment: Shipment;
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
+  uses: ShipmentBatchUseWithBatch[];
   onEdit: (focusField?: string) => void;
 }) {
   const [landedOpen, setLandedOpen] = useState(false);
