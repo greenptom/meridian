@@ -189,7 +189,7 @@ function LandingAndCosts({ shipment: s }: { shipment: Shipment }) {
                 Per {s.quantity_unit}
               </span>
               <span className="font-mono text-[12px]">
-                {formatCurrency(perUnit, s.currency)}
+                {formatCurrency(perUnit, s.currency, 4)}
               </span>
             </div>
           )}
