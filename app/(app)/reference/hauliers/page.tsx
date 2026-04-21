@@ -5,7 +5,7 @@ export default function HauliersPage() {
     <ComingSoon
       title="Haulier"
       italic="partnerships"
-      phase="Add yours in Phase 2"
+      phase="Arrives in Phase 4"
       description="Your haulier partnerships — primary purpose, applicable products, typical incoterms. Used for auto-fill when logging movements."
     />
   );
