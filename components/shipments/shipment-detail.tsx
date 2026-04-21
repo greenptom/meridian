@@ -30,6 +30,8 @@ const EVENT_LABEL: Record<ShipmentEvent["type"], string> = {
   landed: "Landed",
   customs_cleared: "Customs cleared",
   customs_held: "Customs held",
+  batch_created: "Batch created",
+  batch_used: "Used in batch",
 };
 
 export function ShipmentDetail({

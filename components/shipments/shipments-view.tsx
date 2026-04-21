@@ -46,6 +46,7 @@ export function ShipmentsView({
   const eventsByShipment = useMemo(() => {
     const map = new Map<string, ShipmentEvent[]>();
     for (const e of events) {
+      if (!e.shipment_id) continue;
       const bucket = map.get(e.shipment_id) ?? [];
       bucket.push(e);
       map.set(e.shipment_id, bucket);

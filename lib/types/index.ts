@@ -109,7 +109,9 @@ export type ShipmentEventType =
   | "note_added"
   | "landed"
   | "customs_cleared"
-  | "customs_held";
+  | "customs_held"
+  | "batch_created"
+  | "batch_used";
 
 export interface ShipmentEventChange {
   from: unknown;
@@ -118,10 +120,43 @@ export interface ShipmentEventChange {
 
 export interface ShipmentEvent {
   id: string;
-  shipment_id: string;
+  shipment_id: string | null;
+  batch_id: string | null;
   type: ShipmentEventType;
   summary: string | null;
   changes: Record<string, ShipmentEventChange> | null;
+  payload: Record<string, unknown> | null;
   created_by: string | null;
+  created_at: string;
+}
+
+export interface Organisation {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface Batch {
+  id: string;
+  batch_code: string;
+  blend_name: string | null;
+  roasted_date: string | null;
+  quantity_produced: number | null;
+  quantity_unit: QuantityUnit;
+  notes: string | null;
+  organisation_id: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ShipmentBatchUse {
+  id: string;
+  shipment_id: string;
+  batch_id: string;
+  quantity_used: number;
+  quantity_unit: QuantityUnit;
+  notes: string | null;
+  organisation_id: string;
   created_at: string;
 }
