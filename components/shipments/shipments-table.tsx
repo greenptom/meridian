@@ -8,6 +8,7 @@ import type {
   ShipmentBatchUseWithBatch,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { isUK } from "@/lib/countries";
 import { ShipmentDetail } from "./shipment-detail";
 
 type Filter = "all" | "import" | "export" | "flagged" | "draft";
@@ -54,10 +55,10 @@ export function ShipmentsTable({
       return shipments.filter((s) => s.status === "alert" || s.status === "review");
     if (filter === "draft") return shipments.filter((s) => s.status === "draft");
     if (filter === "import")
-      return shipments.filter((s) => s.destination_country === "United Kingdom");
+      return shipments.filter((s) => isUK(s.destination_country));
     if (filter === "export")
       return shipments.filter(
-        (s) => s.origin_country === "United Kingdom" && s.destination_country !== "United Kingdom"
+        (s) => isUK(s.origin_country) && !isUK(s.destination_country),
       );
     return shipments;
   }, [shipments, filter]);
