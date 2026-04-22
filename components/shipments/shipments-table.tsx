@@ -20,6 +20,16 @@ const statusLabel: Record<string, string> = {
   archived: "Archived",
 };
 
+function isConsumed(
+  shipment: Shipment,
+  uses: ShipmentBatchUseWithBatch[] | undefined,
+): boolean {
+  if (shipment.quantity == null) return false;
+  if (!uses || uses.length === 0) return false;
+  const total = uses.reduce((a, u) => a + Number(u.quantity_used), 0);
+  return shipment.quantity - total <= 0.0005;
+}
+
 export function ShipmentsTable({
   shipments,
   documentsByShipment,
@@ -158,6 +168,11 @@ export function ShipmentsTable({
                       {s.actual_landed_date && (
                         <span className="font-mono text-[9px] uppercase tracking-widest text-[color:var(--color-ink-faint)]">
                           landed
+                        </span>
+                      )}
+                      {isConsumed(s, usesByShipment.get(s.id)) && (
+                        <span className="font-mono text-[9px] uppercase tracking-widest text-[color:var(--color-ink-faint)]">
+                          consumed
                         </span>
                       )}
                     </div>

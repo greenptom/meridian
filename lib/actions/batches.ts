@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   Batch,
   QuantityUnit,
-  Shipment,
   ShipmentBatchUse,
 } from "@/lib/types";
 import type { ActionResult } from "@/lib/actions/shipments";
@@ -292,6 +291,196 @@ function computeBlendedCost(
   }
   if (totalQty === 0) return null;
   return totalCost / totalQty;
+}
+
+export type EligibleSource = {
+  id: string;
+  ref: string;
+  origin_country: string | null;
+  destination_country: string | null;
+  quantity: number;
+  quantity_unit: QuantityUnit;
+  remaining: number;
+};
+
+export async function listEligibleSources(): Promise<EligibleSource[]> {
+  const supabase = await createClient();
+  const { data: rows } = await supabase
+    .from("shipments")
+    .select(
+      "id, ref, origin_country, destination_country, quantity, quantity_unit, status",
+    )
+    .not("quantity", "is", null)
+    .not("quantity_unit", "is", null)
+    .in("status", ["active", "review"]);
+
+  const shipments = (rows ?? []) as {
+    id: string;
+    ref: string;
+    origin_country: string | null;
+    destination_country: string | null;
+    quantity: number;
+    quantity_unit: QuantityUnit;
+    status: string;
+  }[];
+  if (shipments.length === 0) return [];
+
+  const ids = shipments.map((s) => s.id);
+  const { data: uses } = await supabase
+    .from("shipment_batch_uses")
+    .select("shipment_id, quantity_used")
+    .in("shipment_id", ids);
+  const usedById = new Map<string, number>();
+  for (const u of uses ?? []) {
+    usedById.set(
+      u.shipment_id,
+      (usedById.get(u.shipment_id) ?? 0) + Number(u.quantity_used),
+    );
+  }
+
+  return shipments
+    .map((s) => ({
+      id: s.id,
+      ref: s.ref,
+      origin_country: s.origin_country,
+      destination_country: s.destination_country,
+      quantity: Number(s.quantity),
+      quantity_unit: s.quantity_unit,
+      remaining: Number(s.quantity) - (usedById.get(s.id) ?? 0),
+    }))
+    .filter((s) => s.remaining > 0)
+    .sort((a, b) => a.ref.localeCompare(b.ref));
+}
+
+export type BatchSource = {
+  use_id: string;
+  shipment_id: string;
+  ref: string;
+  origin_country: string | null;
+  destination_country: string | null;
+  quantity_used: number;
+  quantity_unit: QuantityUnit;
+  per_unit_landed: number | null;
+  total_contribution: number | null;
+  missing_cost_fields: string[];
+};
+
+export type BatchDetailData = {
+  batch: Batch;
+  sources: BatchSource[];
+  blended_cost: number | null;
+};
+
+const COST_FIELDS = [
+  "invoice_value",
+  "freight_cost",
+  "insurance_cost",
+  "duty_cost",
+  "other_costs",
+] as const;
+const COST_FIELD_LABELS: Record<(typeof COST_FIELDS)[number], string> = {
+  invoice_value: "invoice value",
+  freight_cost: "freight",
+  insurance_cost: "insurance",
+  duty_cost: "duty",
+  other_costs: "other costs",
+};
+
+export async function getBatchBySlug(
+  batchCode: string,
+): Promise<BatchDetailData | null> {
+  const supabase = await createClient();
+  const { data: batch } = await supabase
+    .from("batches")
+    .select("*")
+    .eq("batch_code", batchCode)
+    .single();
+  if (!batch) return null;
+
+  const { data: useRows } = await supabase
+    .from("shipment_batch_uses")
+    .select("id, shipment_id, quantity_used, quantity_unit")
+    .eq("batch_id", batch.id);
+  const uses = (useRows ?? []) as {
+    id: string;
+    shipment_id: string;
+    quantity_used: number;
+    quantity_unit: QuantityUnit;
+  }[];
+
+  const sourceIds = Array.from(new Set(uses.map((u) => u.shipment_id)));
+  const { data: shipRows } =
+    sourceIds.length === 0
+      ? { data: [] }
+      : await supabase
+          .from("shipments")
+          .select(
+            "id, ref, origin_country, destination_country, quantity, invoice_value, freight_cost, insurance_cost, duty_cost, other_costs",
+          )
+          .in("id", sourceIds);
+  const shipById = new Map(
+    (shipRows ?? []).map((s) => [s.id as string, s]),
+  );
+
+  const sources: BatchSource[] = uses.map((u) => {
+    const s = shipById.get(u.shipment_id);
+    const ref = s?.ref ?? u.shipment_id;
+    const missing: string[] = [];
+    for (const f of COST_FIELDS) {
+      if (!s || s[f] == null) missing.push(COST_FIELD_LABELS[f]);
+    }
+    if (!s || s.quantity == null || Number(s.quantity) === 0) {
+      missing.push("quantity");
+    }
+    const total =
+      missing.length === 0 && s
+        ? Number(s.invoice_value) +
+          Number(s.freight_cost) +
+          Number(s.insurance_cost) +
+          Number(s.duty_cost) +
+          Number(s.other_costs)
+        : null;
+    const perUnit =
+      total != null && s && s.quantity != null && Number(s.quantity) !== 0
+        ? total / Number(s.quantity)
+        : null;
+    const contribution =
+      perUnit != null ? perUnit * Number(u.quantity_used) : null;
+    return {
+      use_id: u.id,
+      shipment_id: u.shipment_id,
+      ref,
+      origin_country: s?.origin_country ?? null,
+      destination_country: s?.destination_country ?? null,
+      quantity_used: Number(u.quantity_used),
+      quantity_unit: u.quantity_unit,
+      per_unit_landed: perUnit,
+      total_contribution: contribution,
+      missing_cost_fields: missing,
+    };
+  });
+
+  const anyMissing = sources.some((s) => s.missing_cost_fields.length > 0);
+  let blended: number | null = null;
+  if (!anyMissing && sources.length > 0) {
+    let totalCost = 0;
+    let totalQty = 0;
+    for (const s of sources) {
+      if (s.total_contribution == null) {
+        blended = null;
+        break;
+      }
+      totalCost += s.total_contribution;
+      totalQty += s.quantity_used;
+    }
+    blended = totalQty > 0 ? totalCost / totalQty : null;
+  }
+
+  return {
+    batch: batch as Batch,
+    sources: sources.sort((a, b) => a.ref.localeCompare(b.ref)),
+    blended_cost: blended,
+  };
 }
 
 export async function getRemainingByShipment(

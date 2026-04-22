@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type {
   Shipment,
   ShipmentDocument,
@@ -39,7 +40,7 @@ export function ShipmentDetail({
   shipment: s,
   documents,
   events,
-  uses: _uses,
+  uses,
   onEdit,
 }: {
   shipment: Shipment;
@@ -144,6 +145,12 @@ export function ShipmentDetail({
       <Section label="Documents">
         <DocumentsList documents={documents} />
       </Section>
+
+      {uses.length > 0 && (
+        <Section label="Batches produced from this shipment">
+          <BatchesUsedList uses={uses} />
+        </Section>
+      )}
 
       <Section label="Activity">
         <ActivityList shipment={s} events={events} />
@@ -358,14 +365,74 @@ function ActivityList({
 
   return (
     <div className="flex flex-col gap-3.5">
-      {events.map((e, i) => (
-        <Event
-          key={e.id}
-          title={e.summary ?? EVENT_LABEL[e.type]}
-          metaIso={e.created_at}
-          current={i === 0}
-        />
-      ))}
+      {events.map((e, i) => {
+        const title = e.summary ?? EVENT_LABEL[e.type];
+        const batchCode =
+          e.type === "batch_used" && e.payload
+            ? (e.payload.batch_code as string | undefined)
+            : undefined;
+        const href = batchCode
+          ? `/batches/${encodeURIComponent(batchCode)}`
+          : null;
+        return (
+          <Event
+            key={e.id}
+            title={title}
+            href={href}
+            metaIso={e.created_at}
+            current={i === 0}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function BatchesUsedList({
+  uses,
+}: {
+  uses: ShipmentBatchUseWithBatch[];
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {uses.map((u) => {
+        const code = u.batch?.batch_code;
+        const label = `${u.quantity_used} ${u.quantity_unit}`;
+        const inner = (
+          <div
+            className="flex items-center justify-between gap-3 px-3 py-2 rounded border"
+            style={{
+              background: "var(--color-paper-warm)",
+              borderColor: "var(--color-line-soft)",
+            }}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[12px] text-[color:var(--color-ink-soft)]">
+                {code ?? "—"}
+              </div>
+              {u.batch?.blend_name && (
+                <div className="text-[12.5px] font-medium truncate">
+                  {u.batch.blend_name}
+                </div>
+              )}
+            </div>
+            <div className="font-mono text-[11px] text-[color:var(--color-ink-soft)]">
+              {label}
+            </div>
+          </div>
+        );
+        return code ? (
+          <Link
+            key={u.id}
+            href={`/batches/${encodeURIComponent(code)}`}
+            className="hover:no-underline"
+          >
+            {inner}
+          </Link>
+        ) : (
+          <div key={u.id}>{inner}</div>
+        );
+      })}
     </div>
   );
 }
@@ -406,10 +473,12 @@ function Field({
 function Event({
   title,
   metaIso,
+  href = null,
   current = false,
 }: {
   title: string;
   metaIso: string;
+  href?: string | null;
   current?: boolean;
 }) {
   return (
@@ -422,7 +491,15 @@ function Event({
         }}
       />
       <div className="flex-1">
-        <div className="text-[12.5px] font-medium">{title}</div>
+        <div className="text-[12.5px] font-medium">
+          {href ? (
+            <Link href={href} className="hover:underline">
+              {title}
+            </Link>
+          ) : (
+            title
+          )}
+        </div>
         <div className="text-[11px] font-mono text-[color:var(--color-ink-faint)] mt-0.5">
           <ClientTime iso={metaIso} mode="dateShort" /> ·{" "}
           <ClientTime iso={metaIso} mode="time" />
