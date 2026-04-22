@@ -6,7 +6,6 @@ import type {
   ShipmentDocument,
   ShipmentEvent,
   ShipmentStatus,
-  ShipmentBatchUseWithBatch,
 } from "@/lib/types";
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
 import { formatCurrency } from "@/lib/utils";
@@ -31,21 +30,17 @@ const EVENT_LABEL: Record<ShipmentEvent["type"], string> = {
   landed: "Landed",
   customs_cleared: "Customs cleared",
   customs_held: "Customs held",
-  batch_created: "Batch created",
-  batch_used: "Used in batch",
 };
 
 export function ShipmentDetail({
   shipment: s,
   documents,
   events,
-  uses: _uses,
   onEdit,
 }: {
   shipment: Shipment;
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
-  uses: ShipmentBatchUseWithBatch[];
   onEdit: (focusField?: string) => void;
 }) {
   const [landedOpen, setLandedOpen] = useState(false);

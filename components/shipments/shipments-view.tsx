@@ -7,7 +7,6 @@ import type {
   CommodityCode,
   ShipmentDocument,
   ShipmentEvent,
-  ShipmentBatchUseWithBatch,
 } from "@/lib/types";
 import { KpiStrip } from "./kpi-strip";
 import { ShipmentsPageHeader } from "./page-header";
@@ -20,7 +19,6 @@ export function ShipmentsView({
   commodityCodes,
   documents,
   events,
-  batchUses,
   headerVariant = "default",
 }: {
   shipments: Shipment[];
@@ -28,7 +26,6 @@ export function ShipmentsView({
   commodityCodes: CommodityCode[];
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
-  batchUses: ShipmentBatchUseWithBatch[];
   headerVariant?: "default" | "drafts";
 }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -56,16 +53,6 @@ export function ShipmentsView({
     }
     return map;
   }, [events]);
-
-  const usesByShipment = useMemo(() => {
-    const map = new Map<string, ShipmentBatchUseWithBatch[]>();
-    for (const u of batchUses) {
-      const bucket = map.get(u.shipment_id) ?? [];
-      bucket.push(u);
-      map.set(u.shipment_id, bucket);
-    }
-    return map;
-  }, [batchUses]);
 
   const activeCount = shipments.filter((s) => s.status === "active").length;
   const flaggedCount = shipments.filter(
@@ -103,7 +90,6 @@ export function ShipmentsView({
         shipments={shipments}
         documentsByShipment={documentsByShipment}
         eventsByShipment={eventsByShipment}
-        usesByShipment={usesByShipment}
         onEdit={openEdit}
         hideFilters={headerVariant === "drafts"}
       />
