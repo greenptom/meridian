@@ -5,7 +5,7 @@ export default function InboxPage() {
     <ComingSoon
       title="Email"
       italic="inbox"
-      phase="Arrives in Phase 3"
+      phase="Coming later"
       description="Emails forwarded to shipments@[your-domain] appear here with attachments extracted into draft shipments."
     />
   );
