@@ -97,46 +97,56 @@ export function ShipmentsTable({
 
         {!hideFilters && (
           <div
-            className="flex gap-2 flex-wrap items-center px-[22px] py-3 border-b"
+            className="flex gap-3 flex-wrap items-center px-[22px] py-3 border-b"
             style={{
               background: "var(--color-paper-warm)",
               borderColor: "var(--color-line-soft)",
             }}
           >
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f}
-                onClick={() => setStatusFilter(f)}
-                className={cn(
-                  "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide capitalize",
-                  statusFilter === f
-                    ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
-                    : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
-                )}
-              >
-                {f}
-              </button>
-            ))}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-[color:var(--color-ink-faint)]">
+                Show:
+              </span>
+              {STATUS_FILTERS.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={cn(
+                    "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide capitalize",
+                    statusFilter === f
+                      ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
+                      : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
+                  )}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
             <span
-              className="inline-block w-px h-5 mx-1"
+              className="inline-block w-px h-5"
               style={{ background: "var(--color-line)" }}
               aria-hidden
             />
-            {CATEGORY_FILTERS.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCategoryFilter(c)}
-                className={cn(
-                  "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide",
-                  c === "all" && "capitalize",
-                  categoryFilter === c
-                    ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
-                    : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
-                )}
-              >
-                {c === "all" ? "all" : SHIPMENT_CATEGORY_LABELS[c]}
-              </button>
-            ))}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] text-[color:var(--color-ink-faint)]">
+                Category:
+              </span>
+              {CATEGORY_FILTERS.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setCategoryFilter(c)}
+                  className={cn(
+                    "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide",
+                    c === "all" && "capitalize",
+                    categoryFilter === c
+                      ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
+                      : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
+                  )}
+                >
+                  {c === "all" ? "all" : SHIPMENT_CATEGORY_LABELS[c]}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
