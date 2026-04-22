@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   CustomsStatus,
   QuantityUnit,
+  ShipmentCategory,
   ShipmentEventChange,
   ShipmentStatus,
 } from "@/lib/types";
@@ -17,6 +18,7 @@ export type ShipmentInput = {
   incoterm: string | null;
   commodity_code: string | null;
   product_type: string | null;
+  shipment_category: ShipmentCategory | null;
   invoice_value: number | null;
   currency: string | null;
   ior_name: string | null;
@@ -53,6 +55,7 @@ const FIELD_LABELS: Record<keyof ShipmentInput, string> = {
   incoterm: "Incoterm",
   commodity_code: "Commodity code",
   product_type: "Product",
+  shipment_category: "Category",
   invoice_value: "Invoice value",
   currency: "Currency",
   ior_name: "IOR",
@@ -166,7 +169,7 @@ export async function updateShipment(
   const { data: current, error: fetchError } = await supabase
     .from("shipments")
     .select(
-      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, invoice_value, currency, ior_name, reason, po_number, quantity, quantity_unit, expected_landed_date, actual_landed_date, customs_status, freight_cost, insurance_cost, duty_cost, other_costs",
+      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, shipment_category, invoice_value, currency, ior_name, reason, po_number, quantity, quantity_unit, expected_landed_date, actual_landed_date, customs_status, freight_cost, insurance_cost, duty_cost, other_costs",
     )
     .eq("id", id)
     .single();
@@ -182,6 +185,7 @@ export async function updateShipment(
     incoterm: current.incoterm,
     commodity_code: current.commodity_code,
     product_type: current.product_type,
+    shipment_category: current.shipment_category,
     invoice_value: current.invoice_value,
     currency: current.currency,
     ior_name: current.ior_name,

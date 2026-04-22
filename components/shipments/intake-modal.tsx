@@ -16,6 +16,11 @@ import type {
   ShipmentStatus,
   QuantityUnit,
   CustomsStatus,
+  ShipmentCategory,
+} from "@/lib/types";
+import {
+  SHIPMENT_CATEGORIES,
+  SHIPMENT_CATEGORY_LABELS,
 } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: ShipmentStatus; label: string }[] = [
@@ -87,6 +92,7 @@ type FormState = {
   incoterm: string;
   commodity_code: string;
   product_type: string;
+  shipment_category: ShipmentCategory | "";
   invoice_value: string;
   currency: string;
   ior_name: string;
@@ -112,6 +118,7 @@ const INITIAL_FORM: FormState = {
   incoterm: "",
   commodity_code: "",
   product_type: "",
+  shipment_category: "",
   invoice_value: "",
   currency: "GBP",
   ior_name: "",
@@ -139,6 +146,7 @@ function formFromShipment(s: Shipment | null | undefined): FormState {
     incoterm: s.incoterm ?? "",
     commodity_code: s.commodity_code ?? "",
     product_type: s.product_type ?? "",
+    shipment_category: s.shipment_category ?? "",
     invoice_value: s.invoice_value != null ? String(s.invoice_value) : "",
     currency: s.currency ?? "GBP",
     ior_name: s.ior_name ?? "",
@@ -168,6 +176,7 @@ function toShipmentInput(form: FormState): ShipmentInput {
     incoterm: form.incoterm || null,
     commodity_code: form.commodity_code || null,
     product_type: form.product_type || null,
+    shipment_category: form.shipment_category || null,
     invoice_value: num(form.invoice_value),
     currency: form.currency || "GBP",
     ior_name: form.ior_name || null,
@@ -325,7 +334,7 @@ export function IntakeModal({
     const nextForm: FormState = { ...INITIAL_FORM };
     type StringFormField = Exclude<
       keyof FormState,
-      "status" | "quantity_unit" | "customs_status"
+      "status" | "quantity_unit" | "customs_status" | "shipment_category"
     >;
     function take<K extends ExtractedFieldName>(
       key: K,
@@ -361,6 +370,15 @@ export function IntakeModal({
       }
     }
 
+    const catEntry = e.shipment_category;
+    if (catEntry.value !== null && catEntry.value !== undefined) {
+      const raw = String(catEntry.value).toLowerCase().trim();
+      if ((SHIPMENT_CATEGORIES as string[]).includes(raw)) {
+        nextForm.shipment_category = raw as ShipmentCategory;
+        filled.shipment_category = catEntry.confidence;
+      }
+    }
+
     if (!nextForm.currency) nextForm.currency = "GBP";
 
     setForm(nextForm);
@@ -373,6 +391,15 @@ export function IntakeModal({
     e.preventDefault();
     setError(null);
     const input = toShipmentInput(form);
+    if (!editingShipment && !input.shipment_category) {
+      setError("Category is required for new shipments.");
+      const catEl = document.getElementById("intake-field-shipment_category");
+      if (catEl instanceof HTMLElement) {
+        catEl.scrollIntoView({ behavior: "smooth", block: "center" });
+        catEl.focus({ preventScroll: true });
+      }
+      return;
+    }
     if (input.actual_landed_date && input.quantity == null) {
       setError(
         "Quantity is required before a shipment can be marked as landed.",
@@ -624,6 +651,29 @@ export function IntakeModal({
                       </option>
                     ))}
                   </datalist>
+                </FormField>
+                <FormField
+                  label={`Category${isEditing ? "" : " *"}`}
+                  confidence={autoFilled.shipment_category}
+                >
+                  <select
+                    id="intake-field-shipment_category"
+                    className={inputClass(autoFilled.shipment_category)}
+                    value={form.shipment_category}
+                    onChange={(e) =>
+                      update(
+                        "shipment_category",
+                        e.target.value as ShipmentCategory | "",
+                      )
+                    }
+                  >
+                    <option value="">— select —</option>
+                    {SHIPMENT_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {SHIPMENT_CATEGORY_LABELS[c]}
+                      </option>
+                    ))}
+                  </select>
                 </FormField>
                 <FormField
                   label="Invoice value"

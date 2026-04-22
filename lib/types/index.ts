@@ -21,6 +21,32 @@ export type CustomsStatus =
   | "cleared"
   | "held";
 
+export type ShipmentCategory =
+  | "coffee"
+  | "coffee_roasted"
+  | "packaging"
+  | "equipment"
+  | "supplies"
+  | "other";
+
+export const SHIPMENT_CATEGORIES: ShipmentCategory[] = [
+  "coffee",
+  "coffee_roasted",
+  "packaging",
+  "equipment",
+  "supplies",
+  "other",
+];
+
+export const SHIPMENT_CATEGORY_LABELS: Record<ShipmentCategory, string> = {
+  coffee: "Coffee",
+  coffee_roasted: "Coffee (roasted)",
+  packaging: "Packaging",
+  equipment: "Equipment",
+  supplies: "Supplies",
+  other: "Other",
+};
+
 export interface Shipment {
   id: string;
   ref: string;
@@ -33,6 +59,7 @@ export interface Shipment {
   incoterm: string | null;
   commodity_code: string | null;
   product_type: string | null;
+  shipment_category: ShipmentCategory | null;
   invoice_value: number | null;
   currency: string | null;
   ior_id: string | null;

@@ -10,6 +10,7 @@ export type ExtractedShipment = {
   haulier_name: ExtractedField<string>;
   incoterm: ExtractedField<string>;
   commodity_code: ExtractedField<string>;
+  shipment_category: ExtractedField<string>;
   invoice_value: ExtractedField<number>;
   currency: ExtractedField<string>;
   reason: ExtractedField<string>;
@@ -26,6 +27,7 @@ export const EXTRACTED_FIELDS = [
   "haulier_name",
   "incoterm",
   "commodity_code",
+  "shipment_category",
   "invoice_value",
   "currency",
   "reason",
@@ -71,6 +73,7 @@ export const EXTRACT_TOOL_SCHEMA: Anthropic.Tool = {
       haulier_name: stringField,
       incoterm: stringField,
       commodity_code: stringField,
+      shipment_category: stringField,
       invoice_value: numberField,
       currency: stringField,
       reason: stringField,
@@ -86,6 +89,7 @@ export const EXTRACT_TOOL_SCHEMA: Anthropic.Tool = {
       "haulier_name",
       "incoterm",
       "commodity_code",
+      "shipment_category",
       "invoice_value",
       "currency",
       "reason",

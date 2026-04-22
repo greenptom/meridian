@@ -5,11 +5,26 @@ import type {
   Shipment,
   ShipmentDocument,
   ShipmentEvent,
+  ShipmentCategory,
+} from "@/lib/types";
+import {
+  SHIPMENT_CATEGORIES,
+  SHIPMENT_CATEGORY_LABELS,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ShipmentDetail } from "./shipment-detail";
 
-type Filter = "all" | "import" | "export" | "flagged" | "draft";
+type StatusFilter = "all" | "import" | "export" | "flagged" | "draft";
+type CategoryFilter = `cat_${ShipmentCategory}`;
+type Filter = StatusFilter | CategoryFilter;
+
+const STATUS_FILTERS: StatusFilter[] = [
+  "all",
+  "import",
+  "export",
+  "flagged",
+  "draft",
+];
 
 const statusLabel: Record<string, string> = {
   active: "Active",
@@ -46,6 +61,10 @@ export function ShipmentsTable({
       return shipments.filter(
         (s) => s.origin_country === "United Kingdom" && s.destination_country !== "United Kingdom"
       );
+    if (filter.startsWith("cat_")) {
+      const cat = filter.slice(4) as ShipmentCategory;
+      return shipments.filter((s) => s.shipment_category === cat);
+    }
     return shipments;
   }, [shipments, filter]);
 
@@ -68,13 +87,13 @@ export function ShipmentsTable({
 
         {!hideFilters && (
           <div
-            className="flex gap-2 flex-wrap px-[22px] py-3 border-b"
+            className="flex gap-2 flex-wrap items-center px-[22px] py-3 border-b"
             style={{
               background: "var(--color-paper-warm)",
               borderColor: "var(--color-line-soft)",
             }}
           >
-            {(["all", "import", "export", "flagged", "draft"] as Filter[]).map((f) => (
+            {STATUS_FILTERS.map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -88,6 +107,28 @@ export function ShipmentsTable({
                 {f}
               </button>
             ))}
+            <span
+              className="inline-block w-px h-5 mx-1"
+              style={{ background: "var(--color-line)" }}
+              aria-hidden
+            />
+            {SHIPMENT_CATEGORIES.map((c) => {
+              const key = `cat_${c}` as CategoryFilter;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setFilter(key)}
+                  className={cn(
+                    "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide",
+                    filter === key
+                      ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
+                      : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
+                  )}
+                >
+                  {SHIPMENT_CATEGORY_LABELS[c]}
+                </button>
+              );
+            })}
           </div>
         )}
 

@@ -7,6 +7,7 @@ import type {
   ShipmentEvent,
   ShipmentStatus,
 } from "@/lib/types";
+import { SHIPMENT_CATEGORY_LABELS } from "@/lib/types";
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
 import { formatCurrency } from "@/lib/utils";
 import { ClientTime } from "@/components/ui/client-time";
@@ -101,6 +102,18 @@ export function ShipmentDetail({
           <Field label="Supplier" value={s.supplier_name} />
           <Field label="Haulier" value={s.haulier_name} />
           <Field label="Commodity" value={s.commodity_code} mono />
+          <Field
+            label="Category"
+            value={
+              s.shipment_category
+                ? SHIPMENT_CATEGORY_LABELS[s.shipment_category]
+                : null
+            }
+            nullAction={{
+              label: "Set a category",
+              onClick: () => onEdit("shipment_category"),
+            }}
+          />
           <Field label="Product" value={s.product_type} />
           <Field label="Invoice value" value={formatCurrency(s.invoice_value, s.currency)} />
           <Field label="IOR" value={s.ior_name} />
@@ -383,16 +396,31 @@ function Field({
   label,
   value,
   mono = false,
+  nullAction,
 }: {
   label: string;
   value: string | number | null | undefined;
   mono?: boolean;
+  nullAction?: { label: string; onClick: () => void };
 }) {
+  const isEmpty = value === null || value === undefined || value === "";
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-[11px] text-[color:var(--color-ink-faint)]">{label}</span>
       <span className={`text-[13px] ${mono ? "font-mono text-[12px]" : "font-medium"}`}>
-        {value ?? "—"}
+        {!isEmpty ? (
+          value
+        ) : nullAction ? (
+          <button
+            type="button"
+            onClick={nullAction.onClick}
+            className="text-[color:var(--color-ink-faint)] hover:text-[color:var(--color-ink)] underline decoration-dotted underline-offset-2"
+          >
+            {nullAction.label}
+          </button>
+        ) : (
+          "—"
+        )}
       </span>
     </div>
   );
