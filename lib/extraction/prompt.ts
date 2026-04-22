@@ -7,7 +7,7 @@ For each field, return the value exactly as it appears in the document (do not t
 - 0.0–0.2: field is absent or you are guessing
 
 Field guidance:
-- origin_country / destination_country: full country name as written. If only a city is given, leave null.
+- origin_country / destination_country: return the **full official English country name**, not a code or local-language form. Expand abbreviations and 2-letter codes (e.g. "UK" → "United Kingdom", "GB" → "United Kingdom", "USA" → "United States", "DE" → "Germany", "Deutschland" → "Germany", "Czechia" → "Czech Republic", "España" → "Spain", "Brasil" → "Brazil"). If the document uses an ambiguous form, pick the most likely full name. If only a city is given, leave null.
 - supplier_name: the party selling/shipping the goods (seller, shipper, consignor).
 - haulier_name: the carrier or freight forwarder (DHL, DPD, Kuehne+Nagel, etc.), not the supplier.
 - incoterm: one of the standard 3-letter Incoterms codes (EXW, FCA, CPT, CIP, DAP, DPU, DDP, FAS, FOB, CFR, CIF). Leave null if not stated.
