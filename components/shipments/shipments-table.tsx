@@ -16,8 +16,7 @@ import { isUK } from "@/lib/countries";
 import { ShipmentDetail } from "./shipment-detail";
 
 type StatusFilter = "all" | "import" | "export" | "flagged" | "draft";
-type CategoryFilter = `cat_${ShipmentCategory}`;
-type Filter = StatusFilter | CategoryFilter;
+type CategoryFilter = "all" | ShipmentCategory;
 
 const STATUS_FILTERS: StatusFilter[] = [
   "all",
@@ -26,6 +25,24 @@ const STATUS_FILTERS: StatusFilter[] = [
   "flagged",
   "draft",
 ];
+
+const CATEGORY_FILTERS: CategoryFilter[] = ["all", ...SHIPMENT_CATEGORIES];
+
+function matchesStatus(s: Shipment, filter: StatusFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "flagged")
+    return s.status === "alert" || s.status === "review";
+  if (filter === "draft") return s.status === "draft";
+  if (filter === "import") return isUK(s.destination_country);
+  if (filter === "export")
+    return isUK(s.origin_country) && !isUK(s.destination_country);
+  return true;
+}
+
+function matchesCategory(s: Shipment, filter: CategoryFilter): boolean {
+  if (filter === "all") return true;
+  return s.shipment_category === filter;
+}
 
 const statusLabel: Record<string, string> = {
   active: "Active",
@@ -49,25 +66,17 @@ export function ShipmentsTable({
   hideFilters?: boolean;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(shipments[0]?.id ?? null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
 
-  const filtered = useMemo(() => {
-    if (filter === "all") return shipments;
-    if (filter === "flagged")
-      return shipments.filter((s) => s.status === "alert" || s.status === "review");
-    if (filter === "draft") return shipments.filter((s) => s.status === "draft");
-    if (filter === "import")
-      return shipments.filter((s) => isUK(s.destination_country));
-    if (filter === "export")
-      return shipments.filter(
-        (s) => isUK(s.origin_country) && !isUK(s.destination_country),
-      );
-    if (filter.startsWith("cat_")) {
-      const cat = filter.slice(4) as ShipmentCategory;
-      return shipments.filter((s) => s.shipment_category === cat);
-    }
-    return shipments;
-  }, [shipments, filter]);
+  const filtered = useMemo(
+    () =>
+      shipments.filter(
+        (s) =>
+          matchesStatus(s, statusFilter) && matchesCategory(s, categoryFilter),
+      ),
+    [shipments, statusFilter, categoryFilter],
+  );
 
   const selected = shipments.find((s) => s.id === selectedId) ?? filtered[0] ?? null;
 
@@ -97,10 +106,10 @@ export function ShipmentsTable({
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f}
-                onClick={() => setFilter(f)}
+                onClick={() => setStatusFilter(f)}
                 className={cn(
                   "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide capitalize",
-                  filter === f
+                  statusFilter === f
                     ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
                     : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
                 )}
@@ -113,23 +122,21 @@ export function ShipmentsTable({
               style={{ background: "var(--color-line)" }}
               aria-hidden
             />
-            {SHIPMENT_CATEGORIES.map((c) => {
-              const key = `cat_${c}` as CategoryFilter;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setFilter(key)}
-                  className={cn(
-                    "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide",
-                    filter === key
-                      ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
-                      : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
-                  )}
-                >
-                  {SHIPMENT_CATEGORY_LABELS[c]}
-                </button>
-              );
-            })}
+            {CATEGORY_FILTERS.map((c) => (
+              <button
+                key={c}
+                onClick={() => setCategoryFilter(c)}
+                className={cn(
+                  "font-mono text-[11px] px-2.5 py-1 rounded border tracking-wide",
+                  c === "all" && "capitalize",
+                  categoryFilter === c
+                    ? "bg-[color:var(--color-ink)] text-[color:var(--color-paper)] border-[color:var(--color-ink)]"
+                    : "bg-white text-[color:var(--color-ink-soft)] border-[color:var(--color-line)] hover:border-[color:var(--color-ink)]"
+                )}
+              >
+                {c === "all" ? "all" : SHIPMENT_CATEGORY_LABELS[c]}
+              </button>
+            ))}
           </div>
         )}
 
