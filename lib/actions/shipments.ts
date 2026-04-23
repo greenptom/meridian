@@ -2,8 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import {
+  lookupFxRate,
+  todayUtcIsoDate,
+  type FxLookup,
+} from "@/lib/fx/frankfurter";
 import type {
   CustomsStatus,
+  FxRateSource,
   QuantityUnit,
   ShipmentCategory,
   ShipmentEventChange,
@@ -21,6 +27,8 @@ export type ShipmentInput = {
   shipment_category: ShipmentCategory | null;
   invoice_value: number | null;
   currency: string | null;
+  fx_rate_to_gbp: number | null;
+  fx_rate_source: FxRateSource | null;
   ior_name: string | null;
   reason: string | null;
   po_number: string | null;
@@ -58,6 +66,8 @@ const FIELD_LABELS: Record<keyof ShipmentInput, string> = {
   shipment_category: "Category",
   invoice_value: "Invoice value",
   currency: "Currency",
+  fx_rate_to_gbp: "FX rate",
+  fx_rate_source: "FX source",
   ior_name: "IOR",
   reason: "Reason",
   po_number: "PO number",
@@ -99,6 +109,37 @@ function friendlyDbError(error: {
   return error?.message ?? "Unknown error";
 }
 
+type ResolvedFx = {
+  fx_rate_to_gbp: number | null;
+  fx_rate_source: FxRateSource | null;
+};
+
+// Turns a raw FxLookup into the two persisted columns.
+function fxColumnsFromLookup(lookup: FxLookup): ResolvedFx {
+  if (lookup.ok) {
+    return { fx_rate_to_gbp: lookup.rate, fx_rate_source: lookup.source };
+  }
+  return { fx_rate_to_gbp: null, fx_rate_source: "needs_review" };
+}
+
+// Resolves the FX columns for a save, given the client's input and
+// (optional) current-record values. The client signals a manual override
+// by sending fx_rate_source === 'manual'; anything else triggers a
+// Frankfurter fetch for `fxDate`.
+async function resolveFx(
+  input: { currency: string | null; fx_rate_to_gbp: number | null; fx_rate_source: FxRateSource | null },
+  fxDate: string,
+): Promise<ResolvedFx> {
+  if (input.fx_rate_source === "manual") {
+    return {
+      fx_rate_to_gbp: input.fx_rate_to_gbp,
+      fx_rate_source: input.fx_rate_to_gbp != null ? "manual" : "needs_review",
+    };
+  }
+  const lookup = await lookupFxRate(input.currency, fxDate);
+  return fxColumnsFromLookup(lookup);
+}
+
 function summariseChanges(
   changes: Record<string, ShipmentEventChange>,
 ): string {
@@ -132,11 +173,15 @@ export async function createShipment(
     product_type = cc?.product_type ?? null;
   }
 
+  const fx = await resolveFx(input, todayUtcIsoDate());
+
   const { data, error } = await supabase
     .from("shipments")
     .insert({
       ...input,
       product_type,
+      fx_rate_to_gbp: fx.fx_rate_to_gbp,
+      fx_rate_source: fx.fx_rate_source,
       created_by: user.id,
       status: "draft",
     })
@@ -169,7 +214,7 @@ export async function updateShipment(
   const { data: current, error: fetchError } = await supabase
     .from("shipments")
     .select(
-      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, shipment_category, invoice_value, currency, ior_name, reason, po_number, quantity, quantity_unit, expected_landed_date, actual_landed_date, customs_status, freight_cost, insurance_cost, duty_cost, other_costs",
+      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, shipment_category, invoice_value, currency, fx_rate_to_gbp, fx_rate_source, ior_name, reason, po_number, quantity, quantity_unit, expected_landed_date, actual_landed_date, customs_status, freight_cost, insurance_cost, duty_cost, other_costs",
     )
     .eq("id", id)
     .single();
@@ -188,6 +233,8 @@ export async function updateShipment(
     shipment_category: current.shipment_category,
     invoice_value: current.invoice_value,
     currency: current.currency,
+    fx_rate_to_gbp: current.fx_rate_to_gbp,
+    fx_rate_source: current.fx_rate_source,
     ior_name: current.ior_name,
     reason: current.reason,
     po_number: current.po_number,
@@ -202,7 +249,30 @@ export async function updateShipment(
     other_costs: current.other_costs,
   };
 
-  const changes = diffInput(currentInput, input);
+  // FX resolution rules on edit:
+  //   - client sent fx_rate_source === 'manual'  → trust the typed rate
+  //   - currency changed                         → re-fetch for today
+  //   - otherwise                                → keep current FX columns
+  const currencyChanged = currentInput.currency !== input.currency;
+  let effectiveInput: ShipmentInput = input;
+  if (input.fx_rate_source === "manual") {
+    const fx = await resolveFx(input, todayUtcIsoDate());
+    effectiveInput = { ...input, ...fx };
+  } else if (currencyChanged) {
+    const fx = await resolveFx(
+      { ...input, fx_rate_source: null },
+      todayUtcIsoDate(),
+    );
+    effectiveInput = { ...input, ...fx };
+  } else {
+    effectiveInput = {
+      ...input,
+      fx_rate_to_gbp: currentInput.fx_rate_to_gbp,
+      fx_rate_source: currentInput.fx_rate_source,
+    };
+  }
+
+  const changes = diffInput(currentInput, effectiveInput);
   const statusChanged = current.status !== nextStatus;
 
   if (Object.keys(changes).length === 0 && !statusChanged) {
@@ -211,7 +281,7 @@ export async function updateShipment(
 
   const { error: updateError } = await supabase
     .from("shipments")
-    .update({ ...input, status: nextStatus })
+    .update({ ...effectiveInput, status: nextStatus })
     .eq("id", id);
   if (updateError) return { ok: false, error: friendlyDbError(updateError) };
 

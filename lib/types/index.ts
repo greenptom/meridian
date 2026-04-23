@@ -47,6 +47,14 @@ export const SHIPMENT_CATEGORY_LABELS: Record<ShipmentCategory, string> = {
   other: "Other",
 };
 
+export type FxRateSource = "frankfurter" | "manual" | "needs_review";
+
+export const FX_RATE_SOURCE_LABELS: Record<FxRateSource, string> = {
+  frankfurter: "Frankfurter",
+  manual: "Manual",
+  needs_review: "Needs review",
+};
+
 export interface Shipment {
   id: string;
   ref: string;
@@ -62,6 +70,8 @@ export interface Shipment {
   shipment_category: ShipmentCategory | null;
   invoice_value: number | null;
   currency: string | null;
+  fx_rate_to_gbp: number | null;
+  fx_rate_source: FxRateSource | null;
   ior_id: string | null;
   ior_name: string | null;
   reason: string | null;

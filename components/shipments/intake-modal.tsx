@@ -17,10 +17,12 @@ import type {
   QuantityUnit,
   CustomsStatus,
   ShipmentCategory,
+  FxRateSource,
 } from "@/lib/types";
 import {
   SHIPMENT_CATEGORIES,
   SHIPMENT_CATEGORY_LABELS,
+  FX_RATE_SOURCE_LABELS,
 } from "@/lib/types";
 
 const STATUS_OPTIONS: { value: ShipmentStatus; label: string }[] = [
@@ -95,6 +97,8 @@ type FormState = {
   shipment_category: ShipmentCategory | "";
   invoice_value: string;
   currency: string;
+  fx_rate_to_gbp: string;
+  fx_rate_source: FxRateSource | "";
   ior_name: string;
   reason: string;
   status: ShipmentStatus;
@@ -121,6 +125,8 @@ const INITIAL_FORM: FormState = {
   shipment_category: "",
   invoice_value: "",
   currency: "GBP",
+  fx_rate_to_gbp: "",
+  fx_rate_source: "",
   ior_name: "",
   reason: "",
   status: "draft",
@@ -149,6 +155,9 @@ function formFromShipment(s: Shipment | null | undefined): FormState {
     shipment_category: s.shipment_category ?? "",
     invoice_value: s.invoice_value != null ? String(s.invoice_value) : "",
     currency: s.currency ?? "GBP",
+    fx_rate_to_gbp:
+      s.fx_rate_to_gbp != null ? String(s.fx_rate_to_gbp) : "",
+    fx_rate_source: s.fx_rate_source ?? "",
     ior_name: s.ior_name ?? "",
     reason: s.reason ?? "",
     status: s.status,
@@ -179,6 +188,8 @@ function toShipmentInput(form: FormState): ShipmentInput {
     shipment_category: form.shipment_category || null,
     invoice_value: num(form.invoice_value),
     currency: form.currency || "GBP",
+    fx_rate_to_gbp: num(form.fx_rate_to_gbp),
+    fx_rate_source: form.fx_rate_source || null,
     ior_name: form.ior_name || null,
     reason: form.reason || null,
     po_number: form.po_number || null,
@@ -235,13 +246,27 @@ export function IntakeModal({
 
   useEffect(() => {
     if (!open || !focusField) return;
-    const el = document.getElementById(`intake-field-${focusField}`);
-    if (el instanceof HTMLElement) {
-      requestAnimationFrame(() => {
+    // The FX input is only rendered in the DOM when the row is
+    // editable (source is 'manual' or 'needs_review'). For a
+    // pre-migration row with a null source, flip it to 'manual' so
+    // the input renders before we query for it.
+    if (focusField === "fx_rate_to_gbp") {
+      setForm((f) =>
+        f.fx_rate_source === "manual" || f.fx_rate_source === "needs_review"
+          ? f
+          : { ...f, fx_rate_source: "manual" },
+      );
+    }
+    // Defer the DOM query one tick so any setForm call above has
+    // committed and the target element exists.
+    const handle = setTimeout(() => {
+      const el = document.getElementById(`intake-field-${focusField}`);
+      if (el instanceof HTMLElement) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         el.focus({ preventScroll: true });
-      });
-    }
+      }
+    }, 0);
+    return () => clearTimeout(handle);
   }, [open, focusField]);
 
   function resetAll() {
@@ -253,7 +278,16 @@ export function IntakeModal({
   }
 
   function update<K extends keyof FormState>(key: K, value: string) {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      // Changing the currency invalidates the FX rate — clear it so the
+      // server re-fetches on save. (GBP short-circuits in resolveFx.)
+      if (key === "currency" && value !== f.currency) {
+        next.fx_rate_to_gbp = "";
+        next.fx_rate_source = "";
+      }
+      return next;
+    });
     if (key in autoFilled) {
       setAutoFilled((a) => {
         const next = { ...a };
@@ -261,6 +295,10 @@ export function IntakeModal({
         return next;
       });
     }
+  }
+
+  function overrideFxRate() {
+    setForm((f) => ({ ...f, fx_rate_source: "manual" }));
   }
 
   const handleFile = useCallback(async (file: File) => {
@@ -334,7 +372,11 @@ export function IntakeModal({
     const nextForm: FormState = { ...INITIAL_FORM };
     type StringFormField = Exclude<
       keyof FormState,
-      "status" | "quantity_unit" | "customs_status" | "shipment_category"
+      | "status"
+      | "quantity_unit"
+      | "customs_status"
+      | "shipment_category"
+      | "fx_rate_source"
     >;
     function take<K extends ExtractedFieldName>(
       key: K,
@@ -702,6 +744,14 @@ export function IntakeModal({
                     <option value="USD">USD</option>
                   </select>
                 </FormField>
+                {form.currency !== "GBP" && (
+                  <FxRow
+                    rate={form.fx_rate_to_gbp}
+                    source={form.fx_rate_source}
+                    onChange={(v) => update("fx_rate_to_gbp", v)}
+                    onOverride={overrideFxRate}
+                  />
+                )}
                 <FormField label="Importer of Record">
                   <input
                     className="form-input"
@@ -961,6 +1011,14 @@ export function IntakeModal({
             border-color: var(--color-ok);
             box-shadow: 0 0 0 3px rgba(61, 107, 78, 0.12);
           }
+          .form-input.form-input-warn {
+            border-color: var(--color-accent);
+            background: var(--color-accent-soft);
+          }
+          .form-input.form-input-warn:focus {
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 3px rgba(180, 70, 50, 0.12);
+          }
         `}</style>
       </div>
     </div>
@@ -1106,6 +1164,95 @@ function TabButton({
     >
       {children}
     </button>
+  );
+}
+
+function FxRow({
+  rate,
+  source,
+  onChange,
+  onOverride,
+}: {
+  rate: string;
+  source: FxRateSource | "";
+  onChange: (v: string) => void;
+  onOverride: () => void;
+}) {
+  const isNeedsReview = source === "needs_review";
+  const isManual = source === "manual";
+  const isPending = !source && !rate;
+  const editable = isManual || isNeedsReview;
+
+  const sourceLabel = source ? FX_RATE_SOURCE_LABELS[source] : "—";
+  const labelSuffix = isManual
+    ? " · Manual (override)"
+    : source === "frankfurter"
+      ? " · Frankfurter"
+      : isNeedsReview
+        ? " · Needs review"
+        : "";
+
+  return (
+    <FormField
+      label={`FX rate (to GBP)${labelSuffix}`}
+      className="col-span-2"
+    >
+      {editable ? (
+        <input
+          id="intake-field-fx_rate_to_gbp"
+          className={
+            isNeedsReview
+              ? "form-input form-input-warn"
+              : "form-input"
+          }
+          type="number"
+          step="0.000001"
+          placeholder={isNeedsReview ? "Enter a rate manually" : "0.000000"}
+          value={rate}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      ) : (
+        <div
+          className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+          style={{
+            borderColor: "var(--color-line)",
+            background: "var(--color-paper-warm)",
+          }}
+        >
+          <span className="font-mono text-[12px]">
+            {isPending ? (
+              <span className="text-[color:var(--color-ink-faint)]">
+                Rate will be set when saved
+              </span>
+            ) : rate ? (
+              <>
+                {rate}{" "}
+                <span className="text-[color:var(--color-ink-faint)]">
+                  · {sourceLabel}
+                </span>
+              </>
+            ) : (
+              <span className="text-[color:var(--color-ink-faint)]">—</span>
+            )}
+          </span>
+          <button
+            type="button"
+            onClick={onOverride}
+            className="font-mono text-[11px] underline text-[color:var(--color-ink-soft)] hover:text-[color:var(--color-ink)]"
+          >
+            Override
+          </button>
+        </div>
+      )}
+      {isNeedsReview && (
+        <div
+          className="text-[11px] font-mono"
+          style={{ color: "var(--color-accent)" }}
+        >
+          FX rate needs review — enter manually.
+        </div>
+      )}
+    </FormField>
   );
 }
 

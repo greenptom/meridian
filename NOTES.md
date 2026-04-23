@@ -1,5 +1,39 @@
 # Engineering notes
 
+## FX rate modelling
+
+Every non-GBP shipment stores a **fixed** GBP conversion rate
+(`fx_rate_to_gbp`) captured at creation time from Frankfurter
+(`api.frankfurter.app`, ECB daily rates, no API key). This matches
+HMRC VAT practice of using invoice-date rates — auditable, never
+revisited.
+
+`fx_rate_source` distinguishes how the number got there:
+
+- `frankfurter` — automatic lookup at save time (GBP rows also get this
+  with rate = 1 for consistency)
+- `manual` — user typed it in (override link in intake modal, or
+  filling in a needs_review row later)
+- `needs_review` — lookup failed: weekend/holiday (Frankfurter serves
+  the previous business day's rate — we detect it by comparing the
+  response `date` to what we asked for), unknown currency (KES, ETB,
+  COP, VND and similar aren't on ECB's list), future-dated row,
+  row older than 10 years, API error, or timeout. Rate is null;
+  the UI prompts the user to set it manually.
+
+**Deliberately out of scope** for v1: forward FX contracts, hedge
+accounting, dynamic rate lookups. If the team buys currency ahead,
+finance adjusts via the manual override. We can add support later if
+the pattern becomes load-bearing; don't build for it speculatively.
+
+Backfill: `npm run backfill-fx` processes any row where
+`fx_rate_to_gbp IS NULL`. Idempotent. Uses the Supabase service role
+(RLS bypassed by design — admin-only script). Keep the inlined FX
+logic in `scripts/backfill-fx-rates.mjs` in sync with
+`lib/fx/frankfurter.ts` if either changes.
+
+
+
 ## Orphaned DB tables from Phase 3.3
 
 The Phase 3.3 migration (`db/phase3_3.sql`) created a batches / production

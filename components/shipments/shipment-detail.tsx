@@ -7,7 +7,7 @@ import type {
   ShipmentEvent,
   ShipmentStatus,
 } from "@/lib/types";
-import { SHIPMENT_CATEGORY_LABELS } from "@/lib/types";
+import { SHIPMENT_CATEGORY_LABELS, FX_RATE_SOURCE_LABELS } from "@/lib/types";
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
 import { formatCurrency } from "@/lib/utils";
 import { ClientTime } from "@/components/ui/client-time";
@@ -115,7 +115,11 @@ export function ShipmentDetail({
             }}
           />
           <Field label="Product" value={s.product_type} />
-          <Field label="Invoice value" value={formatCurrency(s.invoice_value, s.currency)} />
+          <Field
+            label="Invoice value"
+            value={formatCurrency(s.invoice_value, s.currency)}
+            subscript={renderFxSubscript(s, () => onEdit("fx_rate_to_gbp"))}
+          />
           <Field label="IOR" value={s.ior_name} />
         </div>
       </Section>
@@ -397,11 +401,13 @@ function Field({
   value,
   mono = false,
   nullAction,
+  subscript,
 }: {
   label: string;
   value: string | number | null | undefined;
   mono?: boolean;
   nullAction?: { label: string; onClick: () => void };
+  subscript?: React.ReactNode;
 }) {
   const isEmpty = value === null || value === undefined || value === "";
   return (
@@ -422,7 +428,48 @@ function Field({
           "—"
         )}
       </span>
+      {subscript}
     </div>
+  );
+}
+
+function renderFxSubscript(
+  s: Shipment,
+  onSetRate: () => void,
+): React.ReactNode {
+  if (!s.currency || s.currency === "GBP") return null;
+  if (s.invoice_value == null) return null;
+
+  const rate = s.fx_rate_to_gbp;
+  if (rate == null || s.fx_rate_source === "needs_review") {
+    return (
+      <span className="text-[11px] text-[color:var(--color-ink-faint)] mt-0.5">
+        <button
+          type="button"
+          onClick={onSetRate}
+          className="underline decoration-dotted underline-offset-2 hover:text-[color:var(--color-ink)]"
+          style={{ color: "var(--color-accent)" }}
+        >
+          FX rate needs review — set rate
+        </button>
+      </span>
+    );
+  }
+
+  const gbp = s.invoice_value * rate;
+  const sourceLabel = s.fx_rate_source
+    ? FX_RATE_SOURCE_LABELS[s.fx_rate_source]
+    : "—";
+  const rateFormatted = rate.toFixed(4);
+  const tooltip = `Rate ${rate} · ${sourceLabel} · fixed at creation (${new Date(s.created_at).toISOString().slice(0, 10)})`;
+
+  return (
+    <span
+      className="text-[11px] text-[color:var(--color-ink-faint)] mt-0.5 font-mono"
+      title={tooltip}
+    >
+      ({formatCurrency(gbp, "GBP")} at {rateFormatted}, {sourceLabel})
+    </span>
   );
 }
 
