@@ -246,19 +246,8 @@ export function IntakeModal({
 
   useEffect(() => {
     if (!open || !focusField) return;
-    // The FX input is only rendered in the DOM when the row is
-    // editable (source is 'manual' or 'needs_review'). For a
-    // pre-migration row with a null source, flip it to 'manual' so
-    // the input renders before we query for it.
-    if (focusField === "fx_rate_to_gbp") {
-      setForm((f) =>
-        f.fx_rate_source === "manual" || f.fx_rate_source === "needs_review"
-          ? f
-          : { ...f, fx_rate_source: "manual" },
-      );
-    }
-    // Defer the DOM query one tick so any setForm call above has
-    // committed and the target element exists.
+    // Defer the DOM query one tick so FxRow has had a chance to
+    // commit its initiallyEditable-driven input render.
     const handle = setTimeout(() => {
       const el = document.getElementById(`intake-field-${focusField}`);
       if (el instanceof HTMLElement) {
@@ -286,6 +275,13 @@ export function IntakeModal({
         next.fx_rate_to_gbp = "";
         next.fx_rate_source = "";
       }
+      // Typing into the FX rate field is the single trigger that flips
+      // source to 'manual'. Focus alone does not. This keeps a
+      // needs_review flag intact until the user actually changes the
+      // value.
+      if (key === "fx_rate_to_gbp" && value !== f.fx_rate_to_gbp) {
+        next.fx_rate_source = "manual";
+      }
       return next;
     });
     if (key in autoFilled) {
@@ -295,10 +291,6 @@ export function IntakeModal({
         return next;
       });
     }
-  }
-
-  function overrideFxRate() {
-    setForm((f) => ({ ...f, fx_rate_source: "manual" }));
   }
 
   const handleFile = useCallback(async (file: File) => {
@@ -749,7 +741,7 @@ export function IntakeModal({
                     rate={form.fx_rate_to_gbp}
                     source={form.fx_rate_source}
                     onChange={(v) => update("fx_rate_to_gbp", v)}
-                    onOverride={overrideFxRate}
+                    initiallyEditable={focusField === "fx_rate_to_gbp"}
                   />
                 )}
                 <FormField label="Importer of Record">
@@ -1171,26 +1163,31 @@ function FxRow({
   rate,
   source,
   onChange,
-  onOverride,
+  initiallyEditable,
 }: {
   rate: string;
   source: FxRateSource | "";
   onChange: (v: string) => void;
-  onOverride: () => void;
+  initiallyEditable?: boolean;
 }) {
+  // editMode lets the user unlock the input without mutating source
+  // (so a needs_review flag stays until the first actual keystroke).
+  const [editMode, setEditMode] = useState(initiallyEditable ?? false);
   const isNeedsReview = source === "needs_review";
   const isManual = source === "manual";
   const isPending = !source && !rate;
-  const editable = isManual || isNeedsReview;
+  const editable = editMode || isManual || isNeedsReview;
 
-  const sourceLabel = source ? FX_RATE_SOURCE_LABELS[source] : "—";
   const labelSuffix = isManual
     ? " · Manual (override)"
     : source === "frankfurter"
       ? " · Frankfurter"
       : isNeedsReview
         ? " · Needs review"
-        : "";
+        : editMode
+          ? " · Override (type to apply)"
+          : "";
+  const sourceLabel = source ? FX_RATE_SOURCE_LABELS[source] : "—";
 
   return (
     <FormField
@@ -1237,7 +1234,7 @@ function FxRow({
           </span>
           <button
             type="button"
-            onClick={onOverride}
+            onClick={() => setEditMode(true)}
             className="font-mono text-[11px] underline text-[color:var(--color-ink-soft)] hover:text-[color:var(--color-ink)]"
           >
             Override
