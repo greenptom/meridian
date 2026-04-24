@@ -103,7 +103,11 @@ export function ShipmentsView({
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      // Defer the revoke one tick so the browser's download handler
+      // has time to take a reference to the blob before we release it.
+      // Synchronous revoke races with WebKit/Safari and can produce
+      // 0-byte files intermittently.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "Export failed");
     } finally {
