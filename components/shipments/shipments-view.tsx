@@ -77,6 +77,40 @@ export function ShipmentsView({
     setFocusField(null);
   }
 
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  async function onExport() {
+    if (isExporting) return;
+    setExportError(null);
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/export/xlsx");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/);
+      const filename =
+        match?.[1] ??
+        `meridian-shipments-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   return (
     <>
       <ShipmentsPageHeader
@@ -84,7 +118,20 @@ export function ShipmentsView({
         activeCount={activeCount}
         flaggedCount={flaggedCount}
         onNew={openCreate}
+        onExport={headerVariant === "default" ? onExport : undefined}
+        isExporting={isExporting}
       />
+      {exportError && (
+        <div
+          className="mb-4 p-3 rounded text-[12px] font-mono"
+          style={{
+            background: "var(--color-accent-soft)",
+            color: "var(--color-accent)",
+          }}
+        >
+          Export failed: {exportError}
+        </div>
+      )}
       {headerVariant === "default" && <KpiStrip shipments={shipments} />}
       <ShipmentsTable
         shipments={shipments}

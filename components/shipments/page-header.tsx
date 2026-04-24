@@ -5,11 +5,15 @@ export function ShipmentsPageHeader({
   activeCount,
   flaggedCount,
   onNew,
+  onExport,
+  isExporting = false,
 }: {
   variant?: "default" | "drafts";
   activeCount: number;
   flaggedCount: number;
   onNew: () => void;
+  onExport?: () => void;
+  isExporting?: boolean;
 }) {
   const monthLabel = new Date().toLocaleDateString("en-GB", {
     month: "long",
@@ -44,8 +48,12 @@ export function ShipmentsPageHeader({
       </div>
       <div className="flex gap-2.5">
         {!isDrafts && (
-          <button className="btn" disabled title="Phase 4">
-            <span>Export to Excel</span>
+          <button
+            className="btn"
+            onClick={onExport}
+            disabled={isExporting || !onExport}
+          >
+            <span>{isExporting ? "Exporting…" : "Export to Excel"}</span>
           </button>
         )}
         <button className="btn btn-primary" onClick={onNew}>
