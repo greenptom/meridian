@@ -103,6 +103,48 @@ export interface VatRegistration {
   comment: string | null;
 }
 
+export type JurisdictionStatus = "active" | "query_on_hold" | "not_registered";
+
+export const JURISDICTION_STATUS_LABELS: Record<JurisdictionStatus, string> = {
+  active: "Active",
+  query_on_hold: "Query on hold",
+  not_registered: "Not registered",
+};
+
+export interface Jurisdiction {
+  id: string;
+  country_code: string;
+  country_name: string;
+  vat_number: string | null;
+  status: JurisdictionStatus;
+  registered_date: string | null;
+  notes: string | null;
+  // Legacy columns — still in the DB, not written by new code.
+  // Kept on the type so existing reads don't lose shape.
+  registration_type: string | null;
+  managed_by_avask: boolean | null;
+  filing_period: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type JurisdictionEventType =
+  | "created"
+  | "updated"
+  | "archived"
+  | "restored";
+
+export interface JurisdictionEvent {
+  id: string;
+  jurisdiction_id: string;
+  type: JurisdictionEventType;
+  summary: string | null;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 export interface Incoterm {
   code: string;
   full_name: string;

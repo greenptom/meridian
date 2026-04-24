@@ -26,6 +26,16 @@ accounting, dynamic rate lookups. If the team buys currency ahead,
 finance adjusts via the manual override. We can add support later if
 the pattern becomes load-bearing; don't build for it speculatively.
 
+### Deprecated column: `vat_registrations.comment`
+
+As of phase 4.3, the `comment` column on `vat_registrations` is
+deprecated. App code reads and writes via `notes` only. The migration
+copies existing `comment` values into `notes` and leaves the old
+column in place to avoid a disruptive rename. Schedule it for
+removal in a future cleanup migration once nothing reads from it.
+
+---
+
 Backfill: `npm run backfill-fx` processes any row where
 `fx_rate_to_gbp IS NULL`. Idempotent. Uses the Supabase service role
 (RLS bypassed by design — admin-only script). Keep the inlined FX

@@ -66,6 +66,10 @@ const CANONICAL: Record<string, string> = {
   "kenya": "KE",
   "ke": "KE",
   "ken": "KE",
+  "vietnam": "VN",
+  "viet nam": "VN",
+  "vn": "VN",
+  "vnm": "VN",
 };
 
 export function canonicalCountry(
