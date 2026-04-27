@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { ShipmentsView } from "@/components/shipments/shipments-view";
+import {
+  parseTimeWindowParams,
+  resolveTimeWindow,
+} from "@/lib/time-window";
 import type {
   Shipment,
   Incoterm,
@@ -10,18 +14,49 @@ import type {
 
 export const dynamic = "force-dynamic";
 
-export default async function ShipmentsPage() {
+export default async function ShipmentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const flat: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(sp)) {
+    flat[k] = Array.isArray(v) ? v[0] : v;
+  }
+
+  const selection = parseTimeWindowParams(flat);
+  const window = resolveTimeWindow(selection);
+  const destination = flat.destination?.toUpperCase() ?? null;
+
   const supabase = await createClient();
 
-  const [{ data: shipments }, { data: incoterms }, { data: commodityCodes }] = await Promise.all([
-    supabase
-      .from("shipments")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase.from("incoterms").select("*").order("code"),
-    supabase.from("commodity_codes").select("*").order("product_type"),
-  ]);
+  let shipmentsQuery = supabase
+    .from("shipments")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (window.from) {
+    shipmentsQuery = shipmentsQuery.gte(
+      "created_at",
+      window.from.toISOString(),
+    );
+  }
+  if (window.to) {
+    shipmentsQuery = shipmentsQuery.lt("created_at", window.to.toISOString());
+  }
+  // The 100-row cap is kept when no window is active. With an explicit
+  // window the bound does the limiting — finance needs every row in
+  // their selected period.
+  if (!window.from && !window.to) {
+    shipmentsQuery = shipmentsQuery.limit(100);
+  }
+
+  const [{ data: shipments }, { data: incoterms }, { data: commodityCodes }] =
+    await Promise.all([
+      shipmentsQuery,
+      supabase.from("incoterms").select("*").order("code"),
+      supabase.from("commodity_codes").select("*").order("product_type"),
+    ]);
 
   const rows = (shipments ?? []) as Shipment[];
   const ids = rows.map((r) => r.id);
@@ -51,6 +86,8 @@ export default async function ShipmentsPage() {
       commodityCodes={(commodityCodes ?? []) as CommodityCode[]}
       documents={(documents ?? []) as ShipmentDocument[]}
       events={(events ?? []) as ShipmentEvent[]}
+      destinationFilter={destination}
+      windowLabel={window.label}
     />
   );
 }

@@ -12,8 +12,9 @@ import {
   SHIPMENT_CATEGORY_LABELS,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { isUK } from "@/lib/countries";
+import { canonicalCountry, isUK } from "@/lib/countries";
 import { ShipmentDetail } from "./shipment-detail";
+import Link from "next/link";
 
 type StatusFilter = "all" | "import" | "export" | "flagged" | "draft";
 type CategoryFilter = "all" | ShipmentCategory;
@@ -58,12 +59,16 @@ export function ShipmentsTable({
   eventsByShipment,
   onEdit,
   hideFilters = false,
+  destinationFilter = null,
+  windowLabel = null,
 }: {
   shipments: Shipment[];
   documentsByShipment: Map<string, ShipmentDocument[]>;
   eventsByShipment: Map<string, ShipmentEvent[]>;
   onEdit: (s: Shipment, focusField?: string) => void;
   hideFilters?: boolean;
+  destinationFilter?: string | null;
+  windowLabel?: string | null;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(shipments[0]?.id ?? null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -71,11 +76,16 @@ export function ShipmentsTable({
 
   const filtered = useMemo(
     () =>
-      shipments.filter(
-        (s) =>
-          matchesStatus(s, statusFilter) && matchesCategory(s, categoryFilter),
-      ),
-    [shipments, statusFilter, categoryFilter],
+      shipments.filter((s) => {
+        if (destinationFilter) {
+          const code = canonicalCountry(s.destination_country);
+          if (code !== destinationFilter) return false;
+        }
+        return (
+          matchesStatus(s, statusFilter) && matchesCategory(s, categoryFilter)
+        );
+      }),
+    [shipments, statusFilter, categoryFilter, destinationFilter],
   );
 
   const selected = shipments.find((s) => s.id === selectedId) ?? filtered[0] ?? null;
@@ -94,6 +104,42 @@ export function ShipmentsTable({
             Recent <em className="text-[color:var(--color-ink-soft)] font-normal">shipments</em>
           </div>
         </div>
+
+        {(destinationFilter || (windowLabel && windowLabel !== "All time")) && (
+          <div
+            className="flex items-center justify-between gap-3 flex-wrap px-[22px] py-2.5 border-b text-[11px] font-mono"
+            style={{
+              background: "var(--color-paper-warm)",
+              borderColor: "var(--color-line-soft)",
+              color: "var(--color-ink-soft)",
+            }}
+          >
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className="uppercase tracking-widest"
+                style={{ color: "var(--color-ink-faint)" }}
+              >
+                Filtered:
+              </span>
+              {destinationFilter && (
+                <span className="px-2 py-0.5 rounded bg-white border" style={{ borderColor: "var(--color-line)" }}>
+                  destination · {destinationFilter}
+                </span>
+              )}
+              {windowLabel && windowLabel !== "All time" && (
+                <span className="px-2 py-0.5 rounded bg-white border" style={{ borderColor: "var(--color-line)" }}>
+                  window · {windowLabel}
+                </span>
+              )}
+            </div>
+            <Link
+              href="/shipments"
+              className="uppercase tracking-widest underline decoration-dotted underline-offset-2 hover:text-[color:var(--color-ink)]"
+            >
+              Clear
+            </Link>
+          </div>
+        )}
 
         {!hideFilters && (
           <div

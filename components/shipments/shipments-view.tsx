@@ -20,6 +20,8 @@ export function ShipmentsView({
   documents,
   events,
   headerVariant = "default",
+  destinationFilter = null,
+  windowLabel = null,
 }: {
   shipments: Shipment[];
   incoterms: Incoterm[];
@@ -27,6 +29,8 @@ export function ShipmentsView({
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
   headerVariant?: "default" | "drafts";
+  destinationFilter?: string | null;
+  windowLabel?: string | null;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Shipment | null>(null);
@@ -143,6 +147,8 @@ export function ShipmentsView({
         eventsByShipment={eventsByShipment}
         onEdit={openEdit}
         hideFilters={headerVariant === "drafts"}
+        destinationFilter={destinationFilter}
+        windowLabel={windowLabel}
       />
       <IntakeModal
         key={editing?.id ?? "new"}

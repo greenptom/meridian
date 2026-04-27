@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 const workspace = [
   { label: "Shipments", href: "/shipments" },
-  { label: "Tax Exposure", href: "/exposure" },
+  { label: "Tax exposure", href: "/exposure" },
   { label: "Drafts", href: "/drafts" },
   { label: "Inbox", href: "/inbox" },
 ];
