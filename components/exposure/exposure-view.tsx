@@ -18,7 +18,7 @@ export function ExposureView({
   windowLabel,
   selection,
   years,
-  includeArchived,
+  includeFiled,
 }: {
   rows: ExposureRow[];
   kpis: ExposureKpis;
@@ -26,19 +26,22 @@ export function ExposureView({
   windowLabel: string;
   selection: TimeWindowSelection;
   years: number[];
-  includeArchived: boolean;
+  includeFiled: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  function toggleArchived() {
+  function toggleFiled() {
     const next = new URLSearchParams(searchParams);
-    if (includeArchived) {
-      next.set("archived", "0");
+    // Always normalise to the canonical `filed` param. Drop any legacy
+    // `archived` param so the URL doesn't accumulate aliases.
+    next.delete("archived");
+    if (includeFiled) {
+      next.set("filed", "0");
     } else {
-      next.delete("archived");
+      next.delete("filed");
     }
     const qs = next.toString();
     startTransition(() => {
@@ -75,7 +78,7 @@ export function ExposureView({
           <TimeWindowSelector years={years} />
           <button
             type="button"
-            onClick={toggleArchived}
+            onClick={toggleFiled}
             disabled={isPending}
             className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--color-ink-faint)] hover:text-[color:var(--color-ink)] flex items-center gap-1.5"
           >
@@ -83,12 +86,12 @@ export function ExposureView({
               className="inline-block w-3 h-3 rounded-sm border"
               style={{
                 borderColor: "var(--color-line)",
-                background: includeArchived
+                background: includeFiled
                   ? "var(--color-ink)"
                   : "transparent",
               }}
             />
-            Include archived shipments
+            Include filed shipments
           </button>
         </div>
       </header>

@@ -28,7 +28,7 @@ export function ShipmentsView({
   commodityCodes: CommodityCode[];
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
-  headerVariant?: "default" | "drafts";
+  headerVariant?: "default" | "drafts" | "archive";
   destinationFilter?: string | null;
   windowLabel?: string | null;
 }) {
@@ -125,6 +125,7 @@ export function ShipmentsView({
         variant={headerVariant}
         activeCount={activeCount}
         flaggedCount={flaggedCount}
+        totalCount={shipments.length}
         onNew={openCreate}
         onExport={headerVariant === "default" ? onExport : undefined}
         isExporting={isExporting}
@@ -146,7 +147,7 @@ export function ShipmentsView({
         documentsByShipment={documentsByShipment}
         eventsByShipment={eventsByShipment}
         onEdit={openEdit}
-        hideFilters={headerVariant === "drafts"}
+        hideFilters={headerVariant === "drafts" || headerVariant === "archive"}
         destinationFilter={destinationFilter}
         windowLabel={windowLabel}
       />

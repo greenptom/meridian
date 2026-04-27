@@ -25,12 +25,21 @@ import {
   FX_RATE_SOURCE_LABELS,
 } from "@/lib/types";
 
-const STATUS_OPTIONS: { value: ShipmentStatus; label: string }[] = [
+// closed and archived are reached only via the dedicated buttons in
+// the detail panel — disabled here so the dropdown still renders the
+// current value when editing a closed/archived shipment, but the user
+// can't transition into either state through this control.
+const STATUS_OPTIONS: {
+  value: ShipmentStatus;
+  label: string;
+  disabled?: boolean;
+}[] = [
   { value: "draft", label: "Draft" },
   { value: "active", label: "Active" },
   { value: "review", label: "Review" },
   { value: "alert", label: "Flag" },
-  { value: "archived", label: "Archived" },
+  { value: "closed", label: "Closed", disabled: true },
+  { value: "archived", label: "Archived", disabled: true },
 ];
 
 const QUANTITY_UNITS: QuantityUnit[] = [
@@ -596,7 +605,11 @@ export function IntakeModal({
                       }
                     >
                       {STATUS_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
+                        <option
+                          key={o.value}
+                          value={o.value}
+                          disabled={o.disabled}
+                        >
                           {o.label}
                         </option>
                       ))}

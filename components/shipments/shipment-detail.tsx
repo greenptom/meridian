@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type {
   Shipment,
   ShipmentDocument,
@@ -9,8 +10,14 @@ import type {
 } from "@/lib/types";
 import { SHIPMENT_CATEGORY_LABELS, FX_RATE_SOURCE_LABELS } from "@/lib/types";
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
+import {
+  closeShipment,
+  archiveShipment,
+  restoreShipment,
+} from "@/lib/actions/shipments";
 import { formatCurrency } from "@/lib/utils";
 import { ClientTime } from "@/components/ui/client-time";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { MarkLandedModal } from "./mark-landed-modal";
 
 const statusLabel: Record<ShipmentStatus, string> = {
@@ -47,8 +54,38 @@ export function ShipmentDetail({
   events: ShipmentEvent[];
   onEdit: (focusField?: string) => void;
 }) {
+  const router = useRouter();
   const [landedOpen, setLandedOpen] = useState(false);
-  const canMarkLanded = s.status === "active" && !s.actual_landed_date;
+  const [confirmAction, setConfirmAction] =
+    useState<"close" | "archive" | "restore" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const isFiled = s.archived_at !== null;
+  const canMarkLanded =
+    s.status === "active" && !s.actual_landed_date && !isFiled;
+  const canClose =
+    !isFiled && (s.status === "active" || s.status === "review");
+  const canArchive = !isFiled && s.status === "closed";
+  const canRestore = isFiled;
+
+  function runConfirmedAction() {
+    if (!confirmAction) return;
+    const action = confirmAction;
+    startTransition(async () => {
+      const result =
+        action === "close"
+          ? await closeShipment(s.id)
+          : action === "archive"
+            ? await archiveShipment(s.id)
+            : await restoreShipment(s.id);
+      if (!result.ok) {
+        setActionError(result.error);
+      }
+      setConfirmAction(null);
+      router.refresh();
+    });
+  }
 
   return (
     <aside
@@ -63,7 +100,7 @@ export function ShipmentDetail({
           <div className="font-mono text-[11px] text-[color:var(--color-ink-faint)] tracking-wider">
             {s.ref} · <ClientTime iso={s.created_at} mode="date" />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap justify-end">
             {canMarkLanded && (
               <button
                 onClick={() => setLandedOpen(true)}
@@ -74,6 +111,39 @@ export function ShipmentDetail({
                 }}
               >
                 Mark as landed
+              </button>
+            )}
+            {canClose && (
+              <button
+                onClick={() => setConfirmAction("close")}
+                className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded"
+                style={{
+                  background: "var(--color-ink)",
+                  color: "var(--color-paper)",
+                }}
+              >
+                Mark as closed
+              </button>
+            )}
+            {canArchive && (
+              <button
+                onClick={() => setConfirmAction("archive")}
+                className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded"
+                style={{
+                  background: "var(--color-warn)",
+                  color: "var(--color-paper)",
+                }}
+              >
+                Archive
+              </button>
+            )}
+            {canRestore && (
+              <button
+                onClick={() => setConfirmAction("restore")}
+                className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded border hover:bg-[color:var(--color-paper-warm)]"
+                style={{ borderColor: "var(--color-line)" }}
+              >
+                Restore
               </button>
             )}
             <button
@@ -170,6 +240,70 @@ export function ShipmentDetail({
         onClose={() => setLandedOpen(false)}
         onRequestEditQuantity={() => onEdit("quantity")}
       />
+
+      <ConfirmDialog
+        open={confirmAction === "close"}
+        title="Mark as closed?"
+        confirmLabel="Mark as closed"
+        busy={isPending}
+        message={
+          <>
+            Mark <strong>{s.ref}</strong> as closed? This finalises the
+            movement. You can archive it afterwards.
+          </>
+        }
+        onConfirm={runConfirmedAction}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <ConfirmDialog
+        open={confirmAction === "archive"}
+        title="Archive shipment?"
+        tone="caution"
+        confirmLabel="Archive"
+        busy={isPending}
+        message={
+          <>
+            Archive <strong>{s.ref}</strong>? It will move to the archive
+            view and stop appearing in the operational list. You can
+            restore it any time.
+          </>
+        }
+        onConfirm={runConfirmedAction}
+        onCancel={() => setConfirmAction(null)}
+      />
+      <ConfirmDialog
+        open={confirmAction === "restore"}
+        title="Restore shipment?"
+        confirmLabel="Restore"
+        busy={isPending}
+        message={
+          <>
+            Restore <strong>{s.ref}</strong>? It will return to the
+            operational view.
+          </>
+        }
+        onConfirm={runConfirmedAction}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      {actionError && (
+        <div
+          className="mx-[22px] my-3 p-3 rounded text-[12px] font-mono"
+          style={{
+            background: "var(--color-accent-soft)",
+            color: "var(--color-accent)",
+          }}
+        >
+          {actionError}
+          <button
+            type="button"
+            onClick={() => setActionError(null)}
+            className="ml-2 underline decoration-dotted underline-offset-2"
+          >
+            dismiss
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

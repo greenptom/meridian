@@ -16,7 +16,7 @@ export function ConfirmDialog({
   message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
-  tone?: "neutral" | "danger";
+  tone?: "neutral" | "caution" | "danger";
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -59,7 +59,7 @@ export function ConfirmDialog({
           </button>
           <button
             type="button"
-            className={tone === "danger" ? "btn btn-danger" : "btn btn-primary"}
+            className="btn btn-primary"
             onClick={onConfirm}
             disabled={busy}
             style={
@@ -67,8 +67,15 @@ export function ConfirmDialog({
                 ? {
                     background: "var(--color-accent)",
                     color: "var(--color-paper)",
+                    borderColor: "var(--color-accent)",
                   }
-                : undefined
+                : tone === "caution"
+                  ? {
+                      background: "var(--color-warn)",
+                      color: "var(--color-paper)",
+                      borderColor: "var(--color-warn)",
+                    }
+                  : undefined
             }
           >
             {busy ? "Working…" : confirmLabel}

@@ -4,16 +4,18 @@ export function ShipmentsPageHeader({
   variant = "default",
   activeCount,
   flaggedCount,
+  totalCount,
   onNew,
   onExport,
   isExporting = false,
 }: {
-  variant?: "default" | "drafts";
+  variant?: "default" | "drafts" | "archive";
   activeCount: number;
   flaggedCount: number;
   onNew: () => void;
   onExport?: () => void;
   isExporting?: boolean;
+  totalCount?: number;
 }) {
   const monthLabel = new Date().toLocaleDateString("en-GB", {
     month: "long",
@@ -22,6 +24,7 @@ export function ShipmentsPageHeader({
   });
 
   const isDrafts = variant === "drafts";
+  const isArchive = variant === "archive";
 
   return (
     <header
@@ -30,7 +33,11 @@ export function ShipmentsPageHeader({
     >
       <div>
         <h1 className="font-serif text-[38px] leading-none tracking-tight font-normal">
-          {isDrafts ? (
+          {isArchive ? (
+            <>
+              Archived <em className="text-[color:var(--color-ink-soft)]">movements</em>
+            </>
+          ) : isDrafts ? (
             <>
               Draft <em className="text-[color:var(--color-ink-soft)]">movements</em>
             </>
@@ -41,13 +48,15 @@ export function ShipmentsPageHeader({
           )}
         </h1>
         <div className="font-mono text-[11px] uppercase tracking-widest text-[color:var(--color-ink-faint)] mt-2.5">
-          {isDrafts
-            ? "Awaiting review before they go active"
-            : `${monthLabel} · ${activeCount} active · ${flaggedCount} flagged`}
+          {isArchive
+            ? `${totalCount ?? 0} filed shipment${totalCount === 1 ? "" : "s"}`
+            : isDrafts
+              ? "Awaiting review before they go active"
+              : `${monthLabel} · ${activeCount} active · ${flaggedCount} flagged`}
         </div>
       </div>
       <div className="flex gap-2.5">
-        {!isDrafts && (
+        {!isDrafts && !isArchive && (
           <button
             className="btn"
             onClick={onExport}
@@ -56,9 +65,11 @@ export function ShipmentsPageHeader({
             <span>{isExporting ? "Exporting…" : "Export to Excel"}</span>
           </button>
         )}
-        <button className="btn btn-primary" onClick={onNew}>
-          <span className="text-lg leading-none">+</span> Log movement
-        </button>
+        {!isArchive && (
+          <button className="btn btn-primary" onClick={onNew}>
+            <span className="text-lg leading-none">+</span> Log movement
+          </button>
+        )}
       </div>
     </header>
   );

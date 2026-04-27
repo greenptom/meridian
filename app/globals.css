@@ -19,6 +19,10 @@
   --color-ok-soft: #dde8e0;
   --color-warn: #b88a2a;
   --color-warn-soft: #f1e6cc;
+  --color-closed: #3a4f6b;
+  --color-closed-soft: #dee4ee;
+  --color-archived: #404040;
+  --color-archived-soft: #e0e0e0;
 }
 
 @layer base {
@@ -79,6 +83,8 @@
   .status-draft { background: var(--color-paper-warm); color: var(--color-ink-soft); }
   .status-review { background: var(--color-warn-soft); color: var(--color-warn); }
   .status-alert { background: var(--color-accent-soft); color: var(--color-accent); }
+  .status-closed { background: var(--color-closed-soft); color: var(--color-closed); }
+  .status-archived { background: var(--color-archived-soft); color: var(--color-archived); }
 
   .incoterm {
     @apply inline-block rounded px-2 py-0.5 font-mono text-[11px] tracking-wide;

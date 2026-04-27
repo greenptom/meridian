@@ -19,6 +19,7 @@ export default async function DraftsPage() {
         .from("shipments")
         .select("*")
         .eq("status", "draft")
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(100),
       supabase.from("incoterms").select("*").order("code"),

@@ -24,9 +24,15 @@ export default async function ExposurePage({
   const selection = parseTimeWindowParams(flat);
   const window = resolveTimeWindow(selection);
 
-  // Archived toggle: ON by default. ?archived=0 excludes archived rows.
-  // SQL-level behaviour: when OFF, where status != 'archived'.
-  const includeArchived = flat.archived !== "0";
+  // Filed toggle: ON by default. ?filed=0 excludes filed shipments
+  // (archived_at IS NOT NULL). SQL-level behaviour: when OFF, restrict
+  // to archived_at IS NULL.
+  //
+  // Backwards compat: ?archived=0 from the previous phase still maps to
+  // the same effect. ?filed wins when both are present. Drop the alias
+  // in a future phase once we're sure no one's relying on it.
+  const includeFiled =
+    flat.filed != null ? flat.filed !== "0" : flat.archived !== "0";
 
   const supabase = await createClient();
 
@@ -53,8 +59,8 @@ export default async function ExposurePage({
   if (window.to) {
     shipmentsQuery = shipmentsQuery.lt("created_at", window.to.toISOString());
   }
-  if (!includeArchived) {
-    shipmentsQuery = shipmentsQuery.neq("status", "archived");
+  if (!includeFiled) {
+    shipmentsQuery = shipmentsQuery.is("archived_at", null);
   }
 
   const jurisdictionsQuery = supabase
@@ -85,7 +91,7 @@ export default async function ExposurePage({
       windowLabel={window.label}
       selection={selection}
       years={years}
-      includeArchived={includeArchived}
+      includeFiled={includeFiled}
     />
   );
 }
