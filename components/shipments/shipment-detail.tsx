@@ -18,6 +18,7 @@ const statusLabel: Record<ShipmentStatus, string> = {
   draft: "Draft",
   review: "Review",
   alert: "Flag",
+  closed: "Closed",
   archived: "Archived",
 };
 
@@ -31,6 +32,8 @@ const EVENT_LABEL: Record<ShipmentEvent["type"], string> = {
   landed: "Landed",
   customs_cleared: "Customs cleared",
   customs_held: "Customs held",
+  archived: "Archived",
+  restored: "Restored",
 };
 
 export function ShipmentDetail({

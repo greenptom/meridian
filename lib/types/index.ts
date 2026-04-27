@@ -1,4 +1,10 @@
-export type ShipmentStatus = "draft" | "active" | "review" | "alert" | "archived";
+export type ShipmentStatus =
+  | "draft"
+  | "active"
+  | "review"
+  | "alert"
+  | "closed"
+  | "archived";
 
 export type FlagCode =
   | "NO_VAT_REG_FOR_DDP"
@@ -90,6 +96,7 @@ export interface Shipment {
   created_by: string;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
 }
 
 export interface VatRegistration {
@@ -188,7 +195,9 @@ export type ShipmentEventType =
   | "note_added"
   | "landed"
   | "customs_cleared"
-  | "customs_held";
+  | "customs_held"
+  | "archived"
+  | "restored";
 
 export interface ShipmentEventChange {
   from: unknown;

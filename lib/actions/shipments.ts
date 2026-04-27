@@ -52,6 +52,7 @@ const STATUS_LABELS: Record<string, string> = {
   active: "Active",
   review: "Review",
   alert: "Flag",
+  closed: "Closed",
   archived: "Archived",
 };
 
@@ -210,6 +211,22 @@ export async function updateShipment(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Not authenticated" };
+
+  // Closed and archived are reached only through the dedicated
+  // close/archive actions so the precondition checks run. Reject
+  // direct edits with a friendly nudge.
+  if (nextStatus === "closed") {
+    return {
+      ok: false,
+      error: "Use the Mark as closed button to close a shipment.",
+    };
+  }
+  if (nextStatus === "archived") {
+    return {
+      ok: false,
+      error: "Use the Archive button to file shipments.",
+    };
+  }
 
   const { data: current, error: fetchError } = await supabase
     .from("shipments")
@@ -473,4 +490,162 @@ function formatCostSummary(value: number, currency: string | null): string {
   } catch {
     return `${code} ${value.toLocaleString()}`;
   }
+}
+
+// ===========================================================================
+// Archive workflow — two-step lifecycle.
+//
+// closeShipment    : active|review → status='closed' (stays in /shipments)
+// archiveShipment  : closed         → archived_at=now() (moves to /archive)
+// restoreShipment  : archived_at IS NOT NULL → archived_at=null
+//
+// Each writes a precise event so the audit trail shows the lifecycle
+// distinctly from generic status_changed updates. Restore lazily
+// migrates legacy status='archived' rows to 'closed' on the way back
+// out of the archive — one less special case to worry about over time.
+// ===========================================================================
+
+export async function closeShipment(
+  id: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const { data: current, error: fetchError } = await supabase
+    .from("shipments")
+    .select("status, archived_at")
+    .eq("id", id)
+    .single();
+  if (fetchError || !current) {
+    return { ok: false, error: fetchError?.message ?? "Shipment not found" };
+  }
+
+  if (current.status !== "active" && current.status !== "review") {
+    return {
+      ok: false,
+      error: `Only active or review shipments can be closed. This one is ${STATUS_LABELS[current.status] ?? current.status}.`,
+    };
+  }
+
+  const { error: updateError } = await supabase
+    .from("shipments")
+    .update({ status: "closed" })
+    .eq("id", id);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  const fromLabel = STATUS_LABELS[current.status] ?? current.status;
+  await supabase.from("shipment_events").insert({
+    shipment_id: id,
+    type: "status_changed",
+    summary: `Status: ${fromLabel} → Closed`,
+    changes: { status: { from: current.status, to: "closed" } },
+    created_by: user.id,
+  });
+
+  revalidatePath("/shipments");
+  revalidatePath("/drafts");
+  return { ok: true, data: undefined };
+}
+
+export async function archiveShipment(
+  id: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const { data: current, error: fetchError } = await supabase
+    .from("shipments")
+    .select("status, archived_at, ref")
+    .eq("id", id)
+    .single();
+  if (fetchError || !current) {
+    return { ok: false, error: fetchError?.message ?? "Shipment not found" };
+  }
+
+  if (current.archived_at) {
+    return { ok: false, error: "Already archived." };
+  }
+  if (current.status !== "closed") {
+    return {
+      ok: false,
+      error: "Only closed shipments can be archived. Mark it as closed first.",
+    };
+  }
+
+  const archivedAt = new Date().toISOString();
+  const { error: updateError } = await supabase
+    .from("shipments")
+    .update({ archived_at: archivedAt })
+    .eq("id", id);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  await supabase.from("shipment_events").insert({
+    shipment_id: id,
+    type: "archived",
+    summary: `Archived ${current.ref}`,
+    changes: { archived_at: { from: null, to: archivedAt } },
+    created_by: user.id,
+  });
+
+  revalidatePath("/shipments");
+  revalidatePath("/drafts");
+  revalidatePath("/archive");
+  return { ok: true, data: undefined };
+}
+
+export async function restoreShipment(
+  id: string,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not authenticated" };
+
+  const { data: current, error: fetchError } = await supabase
+    .from("shipments")
+    .select("status, archived_at, ref")
+    .eq("id", id)
+    .single();
+  if (fetchError || !current) {
+    return { ok: false, error: fetchError?.message ?? "Shipment not found" };
+  }
+  if (!current.archived_at) {
+    return { ok: false, error: "This shipment isn't archived." };
+  }
+
+  // Lazy migration: legacy rows had their status set to 'archived' in
+  // pre-phase-5 days. Restoring one normalises it to 'closed' so it
+  // can re-enter the archive through the standard path. Recorded in
+  // the event payload so the migration stays visible in audit history.
+  const isLegacy = current.status === "archived";
+  const update: { archived_at: null; status?: ShipmentStatus } = {
+    archived_at: null,
+  };
+  if (isLegacy) update.status = "closed";
+
+  const { error: updateError } = await supabase
+    .from("shipments")
+    .update(update)
+    .eq("id", id);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  const changes: Record<string, ShipmentEventChange> = {
+    archived_at: { from: current.archived_at, to: null },
+  };
+  if (isLegacy) {
+    changes.status = { from: "archived", to: "closed" };
+  }
+  await supabase.from("shipment_events").insert({
+    shipment_id: id,
+    type: "restored",
+    summary: `Restored ${current.ref}`,
+    changes,
+    created_by: user.id,
+  });
+
+  revalidatePath("/shipments");
+  revalidatePath("/drafts");
+  revalidatePath("/archive");
+  return { ok: true, data: undefined };
 }

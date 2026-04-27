@@ -33,6 +33,7 @@ const STATUS_LABEL: Record<Shipment["status"], string> = {
   active: "Active",
   review: "Review",
   alert: "Flag",
+  closed: "Closed",
   archived: "Archived",
 };
 
