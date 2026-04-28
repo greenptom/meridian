@@ -15,9 +15,11 @@ const workspace = [
 
 const reference = [
   { label: "VAT Registrations", href: "/reference/vat" },
+  { label: "Hauliers", href: "/reference/hauliers" },
+  { label: "Suppliers", href: "/reference/suppliers" },
+  { label: "IORs", href: "/reference/iors" },
   { label: "Incoterms", href: "/reference/incoterms" },
   { label: "Commodity Codes", href: "/reference/commodity" },
-  { label: "Hauliers", href: "/reference/hauliers" },
 ];
 
 export function Sidebar({ userEmail }: { userEmail: string | null }) {
