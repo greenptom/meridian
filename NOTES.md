@@ -26,6 +26,30 @@ accounting, dynamic rate lookups. If the team buys currency ahead,
 finance adjusts via the manual override. We can add support later if
 the pattern becomes load-bearing; don't build for it speculatively.
 
+### Legacy free-text columns on `shipments`
+
+As of phase 5.3, shipments use FK columns (`haulier_id`,
+`supplier_id`, `ior_id`) for reference data. The legacy free-text
+columns (`haulier_name`, `supplier_name`, `ior_name`) remain
+populated alongside as a safety net:
+
+- Extraction can still write a tentative free-text value when the
+  scanned name doesn't match any reference row (UI surfaces this as
+  "Not in reference list — Add it")
+- The /archive table view can render historic shipments without an
+  expensive JOIN
+- A correction path exists if the FK linkage ever proves wrong
+
+App code reads from the FK + JOIN by default. The free-text
+columns are write-also-read-fallback. Plan to drop them in a
+future cleanup migration once team confidence is high; don't
+remove until the legacy import path is fully retired.
+
+The shipments FKs use `on delete restrict` (since phase 5.3a) so
+any direct DELETE on a referenced reference row fails loudly. The
+day-to-day protection is application-level: archive actions check
+for live references and refuse with a friendly count.
+
 ### Deprecated column: `vat_registrations.comment`
 
 As of phase 4.3, the `comment` column on `vat_registrations` is
