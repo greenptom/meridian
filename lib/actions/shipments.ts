@@ -19,7 +19,9 @@ import type {
 export type ShipmentInput = {
   origin_country: string | null;
   destination_country: string | null;
+  supplier_id: string | null;
   supplier_name: string | null;
+  haulier_id: string | null;
   haulier_name: string | null;
   incoterm: string | null;
   commodity_code: string | null;
@@ -29,6 +31,7 @@ export type ShipmentInput = {
   currency: string | null;
   fx_rate_to_gbp: number | null;
   fx_rate_source: FxRateSource | null;
+  ior_id: string | null;
   ior_name: string | null;
   reason: string | null;
   po_number: string | null;
@@ -56,7 +59,10 @@ const STATUS_LABELS: Record<string, string> = {
   archived: "Archived",
 };
 
-const FIELD_LABELS: Record<keyof ShipmentInput, string> = {
+// Reference _id columns are intentionally absent — diffs and audit
+// summaries track _name only (decision: _id is plumbing, _name is the
+// human-readable column).
+const FIELD_LABELS: Partial<Record<keyof ShipmentInput, string>> = {
   origin_country: "Origin",
   destination_country: "Destination",
   supplier_name: "Supplier",
@@ -108,6 +114,41 @@ function friendlyDbError(error: {
     return "Quantity must be set before a shipment can be marked as landed.";
   }
   return error?.message ?? "Unknown error";
+}
+
+// Reference dual-write: when the client sends a non-null _id we treat
+// the reference table as the source of truth for the denormalised
+// _name column. The _name from the form is ignored in that case so a
+// stale label (e.g. an old extraction value held in the form) can't
+// drift away from the canonical row. When _id is null the _name is
+// preserved as-is, including the legacy free-text path.
+async function resolveRefNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: ShipmentInput,
+): Promise<ShipmentInput> {
+  async function fetchName(
+    table: "hauliers" | "suppliers" | "iors",
+    id: string | null,
+  ): Promise<string | null> {
+    if (!id) return null;
+    const { data } = await supabase
+      .from(table)
+      .select("name")
+      .eq("id", id)
+      .single();
+    return data?.name ?? null;
+  }
+  const [haulierName, supplierName, iorName] = await Promise.all([
+    fetchName("hauliers", input.haulier_id),
+    fetchName("suppliers", input.supplier_id),
+    fetchName("iors", input.ior_id),
+  ]);
+  return {
+    ...input,
+    haulier_name: input.haulier_id ? haulierName : input.haulier_name,
+    supplier_name: input.supplier_id ? supplierName : input.supplier_name,
+    ior_name: input.ior_id ? iorName : input.ior_name,
+  };
 }
 
 type ResolvedFx = {
@@ -175,11 +216,12 @@ export async function createShipment(
   }
 
   const fx = await resolveFx(input, todayUtcIsoDate());
+  const resolved = await resolveRefNames(supabase, input);
 
   const { data, error } = await supabase
     .from("shipments")
     .insert({
-      ...input,
+      ...resolved,
       product_type,
       fx_rate_to_gbp: fx.fx_rate_to_gbp,
       fx_rate_source: fx.fx_rate_source,
@@ -231,7 +273,7 @@ export async function updateShipment(
   const { data: current, error: fetchError } = await supabase
     .from("shipments")
     .select(
-      "status, origin_country, destination_country, supplier_name, haulier_name, incoterm, commodity_code, product_type, shipment_category, invoice_value, currency, fx_rate_to_gbp, fx_rate_source, ior_name, reason, po_number, quantity, quantity_unit, expected_landed_date, actual_landed_date, customs_status, freight_cost, insurance_cost, duty_cost, other_costs",
+      "status, origin_country, destination_country, supplier_id, supplier_name, haulier_id, haulier_name, incoterm, commodity_code, product_type, shipment_category, invoice_value, currency, fx_rate_to_gbp, fx_rate_source, ior_id, ior_name, reason, po_number, quantity, quantity_unit, expected_landed_date, actual_landed_date, customs_status, freight_cost, insurance_cost, duty_cost, other_costs",
     )
     .eq("id", id)
     .single();
@@ -242,7 +284,9 @@ export async function updateShipment(
   const currentInput: ShipmentInput = {
     origin_country: current.origin_country,
     destination_country: current.destination_country,
+    supplier_id: current.supplier_id,
     supplier_name: current.supplier_name,
+    haulier_id: current.haulier_id,
     haulier_name: current.haulier_name,
     incoterm: current.incoterm,
     commodity_code: current.commodity_code,
@@ -252,6 +296,7 @@ export async function updateShipment(
     currency: current.currency,
     fx_rate_to_gbp: current.fx_rate_to_gbp,
     fx_rate_source: current.fx_rate_source,
+    ior_id: current.ior_id,
     ior_name: current.ior_name,
     reason: current.reason,
     po_number: current.po_number,
@@ -266,24 +311,29 @@ export async function updateShipment(
     other_costs: current.other_costs,
   };
 
+  // Resolve canonical ref names before diff/persist so the audit log
+  // and the denormalised _name columns reflect the source of truth in
+  // the reference tables, not whatever label the form happened to send.
+  const resolvedInput = await resolveRefNames(supabase, input);
+
   // FX resolution rules on edit:
   //   - client sent fx_rate_source === 'manual'  → trust the typed rate
   //   - currency changed                         → re-fetch for today
   //   - otherwise                                → keep current FX columns
-  const currencyChanged = currentInput.currency !== input.currency;
-  let effectiveInput: ShipmentInput = input;
-  if (input.fx_rate_source === "manual") {
-    const fx = await resolveFx(input, todayUtcIsoDate());
-    effectiveInput = { ...input, ...fx };
+  const currencyChanged = currentInput.currency !== resolvedInput.currency;
+  let effectiveInput: ShipmentInput = resolvedInput;
+  if (resolvedInput.fx_rate_source === "manual") {
+    const fx = await resolveFx(resolvedInput, todayUtcIsoDate());
+    effectiveInput = { ...resolvedInput, ...fx };
   } else if (currencyChanged) {
     const fx = await resolveFx(
-      { ...input, fx_rate_source: null },
+      { ...resolvedInput, fx_rate_source: null },
       todayUtcIsoDate(),
     );
-    effectiveInput = { ...input, ...fx };
+    effectiveInput = { ...resolvedInput, ...fx };
   } else {
     effectiveInput = {
-      ...input,
+      ...resolvedInput,
       fx_rate_to_gbp: currentInput.fx_rate_to_gbp,
       fx_rate_source: currentInput.fx_rate_source,
     };
@@ -338,7 +388,7 @@ export async function updateShipment(
   }
 
   const customsBefore = current.customs_status;
-  const customsAfter = input.customs_status;
+  const customsAfter = resolvedInput.customs_status;
   if (customsBefore !== customsAfter) {
     if (customsAfter === "cleared") {
       eventsToInsert.push({

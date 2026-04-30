@@ -98,7 +98,9 @@ import type {
 type FormState = {
   origin_country: string;
   destination_country: string;
+  supplier_id: string | null;
   supplier_name: string;
+  haulier_id: string | null;
   haulier_name: string;
   incoterm: string;
   commodity_code: string;
@@ -108,6 +110,7 @@ type FormState = {
   currency: string;
   fx_rate_to_gbp: string;
   fx_rate_source: FxRateSource | "";
+  ior_id: string | null;
   ior_name: string;
   reason: string;
   status: ShipmentStatus;
@@ -126,7 +129,9 @@ type FormState = {
 const INITIAL_FORM: FormState = {
   origin_country: "",
   destination_country: "",
+  supplier_id: null,
   supplier_name: "",
+  haulier_id: null,
   haulier_name: "",
   incoterm: "",
   commodity_code: "",
@@ -136,6 +141,7 @@ const INITIAL_FORM: FormState = {
   currency: "GBP",
   fx_rate_to_gbp: "",
   fx_rate_source: "",
+  ior_id: null,
   ior_name: "",
   reason: "",
   status: "draft",
@@ -156,7 +162,9 @@ function formFromShipment(s: Shipment | null | undefined): FormState {
   return {
     origin_country: s.origin_country ?? "",
     destination_country: s.destination_country ?? "",
+    supplier_id: s.supplier_id ?? null,
     supplier_name: s.supplier_name ?? "",
+    haulier_id: s.haulier_id ?? null,
     haulier_name: s.haulier_name ?? "",
     incoterm: s.incoterm ?? "",
     commodity_code: s.commodity_code ?? "",
@@ -167,6 +175,7 @@ function formFromShipment(s: Shipment | null | undefined): FormState {
     fx_rate_to_gbp:
       s.fx_rate_to_gbp != null ? String(s.fx_rate_to_gbp) : "",
     fx_rate_source: s.fx_rate_source ?? "",
+    ior_id: s.ior_id ?? null,
     ior_name: s.ior_name ?? "",
     reason: s.reason ?? "",
     status: s.status,
@@ -189,7 +198,9 @@ function toShipmentInput(form: FormState): ShipmentInput {
   return {
     origin_country: form.origin_country || null,
     destination_country: form.destination_country || null,
+    supplier_id: form.supplier_id,
     supplier_name: form.supplier_name || null,
+    haulier_id: form.haulier_id,
     haulier_name: form.haulier_name || null,
     incoterm: form.incoterm || null,
     commodity_code: form.commodity_code || null,
@@ -199,6 +210,7 @@ function toShipmentInput(form: FormState): ShipmentInput {
     currency: form.currency || "GBP",
     fx_rate_to_gbp: num(form.fx_rate_to_gbp),
     fx_rate_source: form.fx_rate_source || null,
+    ior_id: form.ior_id,
     ior_name: form.ior_name || null,
     reason: form.reason || null,
     po_number: form.po_number || null,
