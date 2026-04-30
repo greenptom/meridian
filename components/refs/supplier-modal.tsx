@@ -50,6 +50,7 @@ export function SupplierModal({
   open,
   onClose,
   editing = null,
+  initialName,
   incoterms,
   onCreated,
   zIndex = 100,
@@ -57,6 +58,7 @@ export function SupplierModal({
   open: boolean;
   onClose: () => void;
   editing?: Supplier | null;
+  initialName?: string;
   incoterms: Incoterm[];
   onCreated?: (id: string, name: string) => void;
   zIndex?: number;
@@ -68,10 +70,13 @@ export function SupplierModal({
 
   useEffect(() => {
     if (open) {
-      setForm(fromSupplier(editing));
+      const base = fromSupplier(editing);
+      setForm(
+        editing || !initialName ? base : { ...base, name: initialName },
+      );
       setError(null);
     }
-  }, [open, editing]);
+  }, [open, editing, initialName]);
 
   function update<K extends keyof FormState>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));

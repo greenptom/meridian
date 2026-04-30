@@ -46,12 +46,14 @@ export function IorModal({
   open,
   onClose,
   editing = null,
+  initialName,
   onCreated,
   zIndex = 100,
 }: {
   open: boolean;
   onClose: () => void;
   editing?: Ior | null;
+  initialName?: string;
   onCreated?: (id: string, name: string) => void;
   zIndex?: number;
 }) {
@@ -62,10 +64,13 @@ export function IorModal({
 
   useEffect(() => {
     if (open) {
-      setForm(fromIor(editing));
+      const base = fromIor(editing);
+      setForm(
+        editing || !initialName ? base : { ...base, name: initialName },
+      );
       setError(null);
     }
-  }, [open, editing]);
+  }, [open, editing, initialName]);
 
   function update<K extends keyof FormState>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));

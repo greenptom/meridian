@@ -50,12 +50,14 @@ export function HaulierModal({
   open,
   onClose,
   editing = null,
+  initialName,
   onCreated,
   zIndex = 100,
 }: {
   open: boolean;
   onClose: () => void;
   editing?: Haulier | null;
+  initialName?: string;
   onCreated?: (id: string, name: string) => void;
   zIndex?: number;
 }) {
@@ -66,10 +68,13 @@ export function HaulierModal({
 
   useEffect(() => {
     if (open) {
-      setForm(fromHaulier(editing));
+      const base = fromHaulier(editing);
+      setForm(
+        editing || !initialName ? base : { ...base, name: initialName },
+      );
       setError(null);
     }
-  }, [open, editing]);
+  }, [open, editing, initialName]);
 
   function update<K extends keyof FormState>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));

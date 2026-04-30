@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback, useEffect } from "react";
+import { useState, useTransition, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   createShipment,
@@ -18,12 +18,21 @@ import type {
   CustomsStatus,
   ShipmentCategory,
   FxRateSource,
+  Haulier,
+  Supplier,
+  Ior,
 } from "@/lib/types";
 import {
   SHIPMENT_CATEGORIES,
   SHIPMENT_CATEGORY_LABELS,
   FX_RATE_SOURCE_LABELS,
 } from "@/lib/types";
+import { RefCombobox, type RefOption } from "@/components/ui/ref-combobox";
+import { HaulierModal } from "@/components/refs/haulier-modal";
+import { SupplierModal } from "@/components/refs/supplier-modal";
+import { IorModal } from "@/components/refs/ior-modal";
+
+type RefKind = "haulier" | "supplier" | "ior";
 
 // closed and archived are reached only via the dedicated buttons in
 // the detail panel — disabled here so the dropdown still renders the
@@ -241,6 +250,9 @@ export function IntakeModal({
   onClose,
   incoterms,
   commodityCodes,
+  hauliers: initialHauliers,
+  suppliers: initialSuppliers,
+  iors: initialIors,
   editingShipment = null,
   focusField = null,
 }: {
@@ -248,6 +260,9 @@ export function IntakeModal({
   onClose: () => void;
   incoterms: Incoterm[];
   commodityCodes: CommodityCode[];
+  hauliers: Haulier[];
+  suppliers: Supplier[];
+  iors: Ior[];
   editingShipment?: Shipment | null;
   focusField?: string | null;
 }) {
@@ -264,6 +279,75 @@ export function IntakeModal({
   >({});
   const [upload, setUpload] = useState<UploadState>({ phase: "idle" });
   const [documentId, setDocumentId] = useState<string | null>(null);
+
+  // Reference options held as local state so the inner "Add new" modal
+  // can append the freshly created row without round-tripping through a
+  // router.refresh (which would blank the intake mid-flow).
+  const [hauliers, setHauliers] = useState<RefOption[]>(() =>
+    initialHauliers.map((h) => ({ id: h.id, name: h.name, secondary: h.country })),
+  );
+  const [suppliers, setSuppliers] = useState<RefOption[]>(() =>
+    initialSuppliers.map((s) => ({
+      id: s.id,
+      name: s.name,
+      secondary: s.country,
+    })),
+  );
+  const [iors, setIors] = useState<RefOption[]>(() =>
+    initialIors.map((i) => ({ id: i.id, name: i.name, secondary: i.country })),
+  );
+
+  const [addNew, setAddNew] = useState<{
+    kind: RefKind;
+    initialName: string;
+  } | null>(null);
+
+  function setRefValue(
+    kind: RefKind,
+    v: { id: string | null; label: string },
+  ) {
+    setForm((f) => {
+      if (kind === "haulier") return { ...f, haulier_id: v.id, haulier_name: v.label };
+      if (kind === "supplier") return { ...f, supplier_id: v.id, supplier_name: v.label };
+      return { ...f, ior_id: v.id, ior_name: v.label };
+    });
+    const nameKey = `${kind}_name` as ExtractedFieldName;
+    setAutoFilled((a) => {
+      if (!(nameKey in a)) return a;
+      const next = { ...a };
+      delete next[nameKey];
+      return next;
+    });
+  }
+
+  function appendRefOption(kind: RefKind, opt: RefOption) {
+    if (kind === "haulier") setHauliers((l) => [...l, opt]);
+    else if (kind === "supplier") setSuppliers((l) => [...l, opt]);
+    else setIors((l) => [...l, opt]);
+  }
+
+  function refState(kind: RefKind): { id: string | null; label: string } {
+    if (kind === "haulier")
+      return { id: form.haulier_id, label: form.haulier_name };
+    if (kind === "supplier")
+      return { id: form.supplier_id, label: form.supplier_name };
+    return { id: form.ior_id, label: form.ior_name };
+  }
+
+  const refOptions: Record<RefKind, RefOption[]> = useMemo(
+    () => ({ haulier: hauliers, supplier: suppliers, ior: iors }),
+    [hauliers, suppliers, iors],
+  );
+
+  function refNeedsWarning(kind: RefKind): boolean {
+    const { id, label } = refState(kind);
+    if (id) return false;
+    const trimmed = label.trim();
+    if (!trimmed) return false;
+    return !refOptions[kind].some(
+      (o) => o.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+  }
 
   useEffect(() => {
     if (!open || !focusField) return;
@@ -436,11 +520,45 @@ export function IntakeModal({
 
     if (!nextForm.currency) nextForm.currency = "GBP";
 
+    // Try to resolve extracted ref names to FK rows by exact
+    // case-insensitive match. A hit links the FK and replaces the
+    // _name with the canonical spelling; a miss leaves _id null and
+    // surfaces the "Not in reference list" affordance under the
+    // combobox so the user can add or accept as free text.
+    function resolveExtracted(
+      typed: string,
+      options: RefOption[],
+    ): { id: string | null; label: string } {
+      const q = typed.trim().toLowerCase();
+      if (!q) return { id: null, label: typed };
+      const match = options.find((o) => o.name.toLowerCase() === q);
+      return match
+        ? { id: match.id, label: match.name }
+        : { id: null, label: typed };
+    }
+    if (nextForm.haulier_name) {
+      const r = resolveExtracted(nextForm.haulier_name, hauliers);
+      nextForm.haulier_id = r.id;
+      nextForm.haulier_name = r.label;
+    }
+    if (nextForm.supplier_name) {
+      const r = resolveExtracted(nextForm.supplier_name, suppliers);
+      nextForm.supplier_id = r.id;
+      nextForm.supplier_name = r.label;
+    }
+    // Extraction doesn't return ior_name, but reapply for symmetry in
+    // case the form already had one carried in.
+    if (nextForm.ior_name) {
+      const r = resolveExtracted(nextForm.ior_name, iors);
+      nextForm.ior_id = r.id;
+      nextForm.ior_name = r.label;
+    }
+
     setForm(nextForm);
     setAutoFilled(filled);
     setDocumentId(payload.documentId);
     setUpload({ phase: "done", filename: file.name });
-  }, []);
+  }, [hauliers, suppliers, iors]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -504,6 +622,7 @@ export function IntakeModal({
     isEditing || tab === 2 || (tab === 0 && upload.phase === "done");
 
   return (
+    <>
     <div
       className="fixed inset-0 z-[100] grid place-items-center p-4"
       style={{ background: "rgba(20,15,5,0.4)", backdropFilter: "blur(4px)" }}
@@ -656,23 +775,55 @@ export function IntakeModal({
                   label="Supplier"
                   confidence={autoFilled.supplier_name}
                 >
-                  <input
-                    className={inputClass(autoFilled.supplier_name)}
-                    placeholder="Supplier name"
-                    value={form.supplier_name}
-                    onChange={(e) => update("supplier_name", e.target.value)}
+                  <RefCombobox
+                    value={refState("supplier")}
+                    options={suppliers}
+                    onChange={(v) => setRefValue("supplier", v)}
+                    onAddNew={(name) =>
+                      setAddNew({ kind: "supplier", initialName: name })
+                    }
+                    placeholder="Search suppliers"
+                    inputClassName={inputClass(autoFilled.supplier_name)}
+                    noun="supplier"
                   />
+                  {refNeedsWarning("supplier") && (
+                    <RefWarning
+                      kind="supplier"
+                      onAdd={() =>
+                        setAddNew({
+                          kind: "supplier",
+                          initialName: form.supplier_name,
+                        })
+                      }
+                    />
+                  )}
                 </FormField>
                 <FormField
                   label="Haulier"
                   confidence={autoFilled.haulier_name}
                 >
-                  <input
-                    className={inputClass(autoFilled.haulier_name)}
-                    placeholder="DHL / DPD / Europa"
-                    value={form.haulier_name}
-                    onChange={(e) => update("haulier_name", e.target.value)}
+                  <RefCombobox
+                    value={refState("haulier")}
+                    options={hauliers}
+                    onChange={(v) => setRefValue("haulier", v)}
+                    onAddNew={(name) =>
+                      setAddNew({ kind: "haulier", initialName: name })
+                    }
+                    placeholder="Search hauliers"
+                    inputClassName={inputClass(autoFilled.haulier_name)}
+                    noun="haulier"
                   />
+                  {refNeedsWarning("haulier") && (
+                    <RefWarning
+                      kind="haulier"
+                      onAdd={() =>
+                        setAddNew({
+                          kind: "haulier",
+                          initialName: form.haulier_name,
+                        })
+                      }
+                    />
+                  )}
                 </FormField>
                 <FormField
                   label="Incoterm"
@@ -770,12 +921,27 @@ export function IntakeModal({
                   />
                 )}
                 <FormField label="Importer of Record">
-                  <input
-                    className="form-input"
-                    placeholder="IOR entity name"
-                    value={form.ior_name}
-                    onChange={(e) => update("ior_name", e.target.value)}
+                  <RefCombobox
+                    value={refState("ior")}
+                    options={iors}
+                    onChange={(v) => setRefValue("ior", v)}
+                    onAddNew={(name) =>
+                      setAddNew({ kind: "ior", initialName: name })
+                    }
+                    placeholder="Search IORs"
+                    noun="IOR"
                   />
+                  {refNeedsWarning("ior") && (
+                    <RefWarning
+                      kind="ior"
+                      onAdd={() =>
+                        setAddNew({
+                          kind: "ior",
+                          initialName: form.ior_name,
+                        })
+                      }
+                    />
+                  )}
                 </FormField>
                 {isEditing ? (
                   <FormField label="Product">
@@ -1038,6 +1204,67 @@ export function IntakeModal({
           }
         `}</style>
       </div>
+    </div>
+
+    <HaulierModal
+      open={addNew?.kind === "haulier"}
+      onClose={() => setAddNew(null)}
+      initialName={addNew?.kind === "haulier" ? addNew.initialName : undefined}
+      zIndex={110}
+      onCreated={(id, name) => {
+        appendRefOption("haulier", { id, name, secondary: null });
+        setRefValue("haulier", { id, label: name });
+        setAddNew(null);
+      }}
+    />
+    <SupplierModal
+      open={addNew?.kind === "supplier"}
+      onClose={() => setAddNew(null)}
+      initialName={addNew?.kind === "supplier" ? addNew.initialName : undefined}
+      incoterms={incoterms}
+      zIndex={110}
+      onCreated={(id, name) => {
+        appendRefOption("supplier", { id, name, secondary: null });
+        setRefValue("supplier", { id, label: name });
+        setAddNew(null);
+      }}
+    />
+    <IorModal
+      open={addNew?.kind === "ior"}
+      onClose={() => setAddNew(null)}
+      initialName={addNew?.kind === "ior" ? addNew.initialName : undefined}
+      zIndex={110}
+      onCreated={(id, name) => {
+        appendRefOption("ior", { id, name, secondary: null });
+        setRefValue("ior", { id, label: name });
+        setAddNew(null);
+      }}
+    />
+    </>
+  );
+}
+
+function RefWarning({
+  kind,
+  onAdd,
+}: {
+  kind: RefKind;
+  onAdd: () => void;
+}) {
+  const noun = kind === "ior" ? "IOR" : kind;
+  return (
+    <div
+      className="text-[11px] font-mono mt-1.5 flex items-center gap-2 flex-wrap"
+      style={{ color: "var(--color-accent)" }}
+    >
+      <span>Free text — not in reference list.</span>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="underline decoration-dotted underline-offset-2 hover:no-underline"
+      >
+        + Add as new {noun}
+      </button>
     </div>
   );
 }
