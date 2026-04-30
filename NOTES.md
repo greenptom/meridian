@@ -39,6 +39,12 @@ populated alongside as a safety net:
 - The /archive table view can render historic shipments without an
   expensive JOIN
 - A correction path exists if the FK linkage ever proves wrong
+- haulier_name / supplier_name / ior_name lazily sync from the
+  reference table on next shipment save (via resolveRefNames in
+  lib/actions/shipments.ts). A reference rename will fire
+  "Updated <Field>" audit events tied to whoever next saved each
+  shipment, not the actor who renamed the ref. Acceptable trade-off;
+  eager backfill considered out of scope for v1.
 
 App code reads from the FK + JOIN by default. The free-text
 columns are write-also-read-fallback. Plan to drop them in a
