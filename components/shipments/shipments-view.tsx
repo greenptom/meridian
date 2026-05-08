@@ -7,6 +7,9 @@ import type {
   CommodityCode,
   ShipmentDocument,
   ShipmentEvent,
+  Haulier,
+  Supplier,
+  Ior,
 } from "@/lib/types";
 import { KpiStrip } from "./kpi-strip";
 import { ShipmentsPageHeader } from "./page-header";
@@ -17,6 +20,9 @@ export function ShipmentsView({
   shipments,
   incoterms,
   commodityCodes,
+  hauliers,
+  suppliers,
+  iors,
   documents,
   events,
   headerVariant = "default",
@@ -26,6 +32,9 @@ export function ShipmentsView({
   shipments: Shipment[];
   incoterms: Incoterm[];
   commodityCodes: CommodityCode[];
+  hauliers: Haulier[];
+  suppliers: Supplier[];
+  iors: Ior[];
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
   headerVariant?: "default" | "drafts" | "archive";
@@ -146,6 +155,9 @@ export function ShipmentsView({
         shipments={shipments}
         documentsByShipment={documentsByShipment}
         eventsByShipment={eventsByShipment}
+        hauliers={hauliers}
+        suppliers={suppliers}
+        iors={iors}
         onEdit={openEdit}
         hideFilters={headerVariant === "drafts" || headerVariant === "archive"}
         destinationFilter={destinationFilter}
@@ -157,6 +169,9 @@ export function ShipmentsView({
         onClose={closeModal}
         incoterms={incoterms}
         commodityCodes={commodityCodes}
+        hauliers={hauliers}
+        suppliers={suppliers}
+        iors={iors}
         editingShipment={editing}
         focusField={focusField}
       />

@@ -26,6 +26,36 @@ accounting, dynamic rate lookups. If the team buys currency ahead,
 finance adjusts via the manual override. We can add support later if
 the pattern becomes load-bearing; don't build for it speculatively.
 
+### Legacy free-text columns on `shipments`
+
+As of phase 5.3, shipments use FK columns (`haulier_id`,
+`supplier_id`, `ior_id`) for reference data. The legacy free-text
+columns (`haulier_name`, `supplier_name`, `ior_name`) remain
+populated alongside as a safety net:
+
+- Extraction can still write a tentative free-text value when the
+  scanned name doesn't match any reference row (UI surfaces this as
+  "Not in reference list — Add it")
+- The /archive table view can render historic shipments without an
+  expensive JOIN
+- A correction path exists if the FK linkage ever proves wrong
+- haulier_name / supplier_name / ior_name lazily sync from the
+  reference table on next shipment save (via resolveRefNames in
+  lib/actions/shipments.ts). A reference rename will fire
+  "Updated <Field>" audit events tied to whoever next saved each
+  shipment, not the actor who renamed the ref. Acceptable trade-off;
+  eager backfill considered out of scope for v1.
+
+App code reads from the FK + JOIN by default. The free-text
+columns are write-also-read-fallback. Plan to drop them in a
+future cleanup migration once team confidence is high; don't
+remove until the legacy import path is fully retired.
+
+The shipments FKs use `on delete restrict` (since phase 5.3a) so
+any direct DELETE on a referenced reference row fails loudly. The
+day-to-day protection is application-level: archive actions check
+for live references and refuse with a friendly count.
+
 ### Deprecated column: `vat_registrations.comment`
 
 As of phase 4.3, the `comment` column on `vat_registrations` is
@@ -68,3 +98,13 @@ table's `batch_id` FK and `shipment_events_type_check` first, then drop
 triggers / helper functions). Leaving them in place is harmless; no
 code path writes to them, and the `shipment_events` additions are
 non-breaking.
+
+
+
+## Archived shipment edit guard
+
+Archived shipments previously hit the action-layer "closed/archived"
+guard in `updateShipment`, with the error rendered below the fold of
+the scrollable intake form. Banner + disabled save in the intake modal
+prevents the path entirely; the underlying guard is retained as
+defence-in-depth.

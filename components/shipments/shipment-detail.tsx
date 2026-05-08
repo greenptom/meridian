@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type {
   Shipment,
   ShipmentDocument,
   ShipmentEvent,
   ShipmentStatus,
+  Haulier,
+  Supplier,
+  Ior,
 } from "@/lib/types";
 import { SHIPMENT_CATEGORY_LABELS, FX_RATE_SOURCE_LABELS } from "@/lib/types";
 import { getSignedDocumentUrl } from "@/lib/actions/documents";
@@ -47,11 +50,17 @@ export function ShipmentDetail({
   shipment: s,
   documents,
   events,
+  hauliers,
+  suppliers,
+  iors,
   onEdit,
 }: {
   shipment: Shipment;
   documents: ShipmentDocument[];
   events: ShipmentEvent[];
+  hauliers: Haulier[];
+  suppliers: Supplier[];
+  iors: Ior[];
   onEdit: (focusField?: string) => void;
 }) {
   const router = useRouter();
@@ -60,6 +69,38 @@ export function ShipmentDetail({
     useState<"close" | "archive" | "restore" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const hauliersById = useMemo(
+    () => new Map(hauliers.map((h) => [h.id, h])),
+    [hauliers],
+  );
+  const suppliersById = useMemo(
+    () => new Map(suppliers.map((x) => [x.id, x])),
+    [suppliers],
+  );
+  const iorsById = useMemo(
+    () => new Map(iors.map((i) => [i.id, i])),
+    [iors],
+  );
+
+  const supplierField = resolveRefField(
+    s.supplier_id,
+    s.supplier_name,
+    suppliersById,
+    (r) => [r.country, r.default_incoterm],
+  );
+  const haulierField = resolveRefField(
+    s.haulier_id,
+    s.haulier_name,
+    hauliersById,
+    (r) => [r.country],
+  );
+  const iorField = resolveRefField(
+    s.ior_id,
+    s.ior_name,
+    iorsById,
+    (r) => [r.vat_country, r.eori_number],
+  );
 
   const isFiled = s.archived_at !== null;
   const canMarkLanded =
@@ -172,8 +213,16 @@ export function ShipmentDetail({
         <div className="grid grid-cols-2 gap-x-5 gap-y-3.5">
           <Field label="Origin" value={s.origin_country} />
           <Field label="Destination" value={s.destination_country} />
-          <Field label="Supplier" value={s.supplier_name} />
-          <Field label="Haulier" value={s.haulier_name} />
+          <Field
+            label="Supplier"
+            value={supplierField.value}
+            subscript={supplierField.subscript}
+          />
+          <Field
+            label="Haulier"
+            value={haulierField.value}
+            subscript={haulierField.subscript}
+          />
           <Field label="Commodity" value={s.commodity_code} mono />
           <Field
             label="Category"
@@ -193,7 +242,11 @@ export function ShipmentDetail({
             value={formatCurrency(s.invoice_value, s.currency)}
             subscript={renderFxSubscript(s, () => onEdit("fx_rate_to_gbp"))}
           />
-          <Field label="IOR" value={s.ior_name} />
+          <Field
+            label="IOR"
+            value={iorField.value}
+            subscript={iorField.subscript}
+          />
         </div>
       </Section>
 
@@ -567,6 +620,83 @@ function Field({
       </span>
       {subscript}
     </div>
+  );
+}
+
+type RefRow = { id: string; name: string; deleted_at: string | null };
+
+function resolveRefField<T extends RefRow>(
+  refId: string | null,
+  fallbackName: string | null,
+  byId: Map<string, T>,
+  subscriptParts: (ref: T) => (string | null | undefined)[],
+): { value: string | null; subscript: React.ReactNode } {
+  if (refId) {
+    const ref = byId.get(refId);
+    if (!ref) {
+      // FK points to nothing. `on delete restrict` makes this near-
+      // impossible but a SQL-level intervention can leave us here.
+      // Surface to dev console; render the denormalised _name so the
+      // user sees a coherent value.
+      console.warn(
+        `Shipment reference id ${refId} not found in lookup — falling back to free-text name.`,
+      );
+      return {
+        value: fallbackName,
+        subscript: <RefSubscript variant="freeText" />,
+      };
+    }
+    if (ref.deleted_at) {
+      return {
+        value: ref.name,
+        subscript: (
+          <RefSubscript variant="archived" parts={subscriptParts(ref)} />
+        ),
+      };
+    }
+    return {
+      value: ref.name,
+      subscript: <RefSubscript variant="linked" parts={subscriptParts(ref)} />,
+    };
+  }
+  if (fallbackName) {
+    return {
+      value: fallbackName,
+      subscript: <RefSubscript variant="freeText" />,
+    };
+  }
+  return { value: null, subscript: null };
+}
+
+function RefSubscript({
+  variant,
+  parts = [],
+}: {
+  variant: "linked" | "archived" | "freeText";
+  parts?: (string | null | undefined)[];
+}) {
+  if (variant === "freeText") {
+    return (
+      <span className="text-[11px] text-[color:var(--color-ink-faint)] italic mt-0.5">
+        free text — not linked
+      </span>
+    );
+  }
+  const filtered = parts.filter(
+    (p): p is string => typeof p === "string" && p.trim().length > 0,
+  );
+  if (variant === "archived") {
+    return (
+      <span className="text-[11px] text-[color:var(--color-ink-faint)] mt-0.5">
+        archived{filtered.length > 0 ? ` · ${filtered.join(" · ")}` : ""}
+      </span>
+    );
+  }
+  if (filtered.length === 0) return null;
+  return (
+    <span className="text-[11px] text-[color:var(--color-ink-faint)] mt-0.5">
+      {filtered.join(" · ")}
+    </span>
   );
 }
 

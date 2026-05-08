@@ -6,6 +6,9 @@ import type {
   CommodityCode,
   ShipmentDocument,
   ShipmentEvent,
+  Haulier,
+  Supplier,
+  Ior,
 } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -13,16 +16,27 @@ export const dynamic = "force-dynamic";
 export default async function ArchivePage() {
   const supabase = await createClient();
 
-  const [{ data: shipments }, { data: incoterms }, { data: commodityCodes }] =
-    await Promise.all([
-      supabase
-        .from("shipments")
-        .select("*")
-        .not("archived_at", "is", null)
-        .order("archived_at", { ascending: false }),
-      supabase.from("incoterms").select("*").order("code"),
-      supabase.from("commodity_codes").select("*").order("product_type"),
-    ]);
+  const [
+    { data: shipments },
+    { data: incoterms },
+    { data: commodityCodes },
+    { data: hauliers },
+    { data: suppliers },
+    { data: iors },
+  ] = await Promise.all([
+    supabase
+      .from("shipments")
+      .select("*")
+      .not("archived_at", "is", null)
+      .order("archived_at", { ascending: false }),
+    supabase.from("incoterms").select("*").order("code"),
+    supabase.from("commodity_codes").select("*").order("product_type"),
+    // Includes archived rows for the detail panel JOIN; IntakeModal
+    // filters to active only when building combobox options.
+    supabase.from("hauliers").select("*").order("name"),
+    supabase.from("suppliers").select("*").order("name"),
+    supabase.from("iors").select("*").order("name"),
+  ]);
 
   const rows = (shipments ?? []) as Shipment[];
   const ids = rows.map((r) => r.id);
@@ -50,6 +64,9 @@ export default async function ArchivePage() {
       shipments={rows}
       incoterms={(incoterms ?? []) as Incoterm[]}
       commodityCodes={(commodityCodes ?? []) as CommodityCode[]}
+      hauliers={(hauliers ?? []) as Haulier[]}
+      suppliers={(suppliers ?? []) as Supplier[]}
+      iors={(iors ?? []) as Ior[]}
       documents={(documents ?? []) as ShipmentDocument[]}
       events={(events ?? []) as ShipmentEvent[]}
       headerVariant="archive"

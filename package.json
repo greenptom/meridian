@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "backfill-fx": "node scripts/backfill-fx-rates.mjs"
+    "backfill-fx": "node scripts/backfill-fx-rates.mjs",
+    "reconcile-references": "node scripts/reconcile-shipment-references.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

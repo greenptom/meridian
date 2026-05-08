@@ -6,6 +6,9 @@ import type {
   ShipmentDocument,
   ShipmentEvent,
   ShipmentCategory,
+  Haulier,
+  Supplier,
+  Ior,
 } from "@/lib/types";
 import {
   SHIPMENT_CATEGORIES,
@@ -57,6 +60,9 @@ export function ShipmentsTable({
   shipments,
   documentsByShipment,
   eventsByShipment,
+  hauliers,
+  suppliers,
+  iors,
   onEdit,
   hideFilters = false,
   destinationFilter = null,
@@ -65,6 +71,9 @@ export function ShipmentsTable({
   shipments: Shipment[];
   documentsByShipment: Map<string, ShipmentDocument[]>;
   eventsByShipment: Map<string, ShipmentEvent[]>;
+  hauliers: Haulier[];
+  suppliers: Supplier[];
+  iors: Ior[];
   onEdit: (s: Shipment, focusField?: string) => void;
   hideFilters?: boolean;
   destinationFilter?: string | null;
@@ -277,6 +286,9 @@ export function ShipmentsTable({
           shipment={selected}
           documents={documentsByShipment.get(selected.id) ?? []}
           events={eventsByShipment.get(selected.id) ?? []}
+          hauliers={hauliers}
+          suppliers={suppliers}
+          iors={iors}
           onEdit={(focus) => onEdit(selected, focus)}
         />
       )}

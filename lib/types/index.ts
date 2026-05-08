@@ -169,9 +169,77 @@ export interface CommodityCode {
 export interface Haulier {
   id: string;
   name: string;
+  country: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  notes: string | null;
+  // Legacy columns kept on the type so reads of pre-migration data
+  // still type-check.
   primary_purpose: string | null;
   applicable_products: string | null;
   typical_incoterms: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  country: string | null;
+  commodity_focus: string | null;
+  notes: string | null;
+  default_incoterm: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Ior {
+  id: string;
+  name: string;
+  country: string | null;
+  eori_number: string | null;
+  notes: string | null;
+  // vat_country is the country whose VAT this IOR files in — kept
+  // distinct from `country` (the entity's residency).
+  vat_country: string | null;
+  scenario_type: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ReferenceEventType = "created" | "updated" | "archived" | "restored";
+
+export interface HaulierEvent {
+  id: string;
+  haulier_id: string;
+  type: ReferenceEventType;
+  summary: string | null;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface SupplierEvent {
+  id: string;
+  supplier_id: string;
+  type: ReferenceEventType;
+  summary: string | null;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface IorEvent {
+  id: string;
+  ior_id: string;
+  type: ReferenceEventType;
+  summary: string | null;
+  changes: Record<string, { from: unknown; to: unknown }> | null;
+  created_by: string | null;
+  created_at: string;
 }
 
 export interface ShipmentDocument {
