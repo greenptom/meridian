@@ -83,3 +83,49 @@ won't use the intake modal on. Possible mitigation: lazy-load the intake
 modal entirely on routes that don't immediately need it. Not enough to act
 on now; the data flow consistency has its own value. Revisit during a
 deliberate bundle-size pass.
+
+---
+
+## Reference data
+
+### Sense-check incoterms reference list against ICC 2020
+Status: deferred (no phase assigned, ~5 minute task)
+Source: Phase 5.3 close-out review.
+The Incoterms 2020 edition has exactly 11 codes:
+- Any mode of transport (7): EXW, FCA, CPT, CIP, DAP, DPU, DDP
+- Sea / inland waterway only (4): FAS, FOB, CFR, CIF
+Note: DPU replaced DAT in the 2020 edition. If the existing /reference/incoterms
+table contains DAT instead of (or alongside) DPU, that's an old-edition value
+worth migrating. /reference/incoterms is read-only post-commit-4 — fix would
+require either a one-off SQL update or making the page editable for an admin.
+
+### Commodity codes — seed and refresh strategy
+Status: deferred (Phase 6+)
+Source: Phase 5.3 close-out review.
+Commodity codes are 10-digit values (first 6 = WCO Harmonized System, last 4 =
+UK/EU jurisdiction-specific). Two free UK government sources, both Open
+Government Licence v3:
+- Bulk CSV: https://data.api.trade.gov.uk/v1/datasets/uk-tariff-2021-01-01/versions/latest/tables/commodities/data?format=csv&download
+- Live API: https://www.trade-tariff.service.gov.uk/uk/api/ (JSON, no auth)
+
+Full UK tariff = ~17,000 codes — overkill for Meridian. Coffee/beverage
+logistics lives in HS chapters 09 (coffee/tea), 21 (extracts/instant), 22
+(beverages), plus packaging chapters 39 (plastics), 73 (iron/steel — tin
+containers etc.), 76 (aluminium). Filtering on download to those chapters
+gives ~few hundred codes covering 99% of real shipments.
+
+Possible Phase 6+ implementation: seed via filtered CSV import; live API
+lookup at runtime for commodity-code search/autocomplete in shipment intake.
+
+---
+
+## Permissions
+
+### Admin / operative role split
+Status: deferred (Phase 6 — explicitly approved during Phase 5.1 scoping)
+Source: Phase 5.1 archive workflow scoping conversation.
+v1 decision was "anyone @grind.co.uk can do anything." Admin-gated actions
+(permanent delete, user management, future audit log access) deferred to
+Phase 6 alongside admin wiring more broadly. Likely shape: an `is_admin`
+boolean on a `user_profiles` table linked to `auth.users.id`, or a roles
+enum if the model needs to grow beyond admin/operative.

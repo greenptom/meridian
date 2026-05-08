@@ -108,3 +108,25 @@ guard in `updateShipment`, with the error rendered below the fold of
 the scrollable intake form. Banner + disabled save in the intake modal
 prevents the path entirely; the underlying guard is retained as
 defence-in-depth.
+
+
+
+## Auth domain restriction
+
+Sign-up access is restricted to @grind.co.uk email addresses through two
+layers (belt-and-braces):
+
+1. Sign-up toggle disabled in Supabase Authentication → Sign In / Up.
+   Users must be added manually via the Authentication → Users admin panel.
+2. Postgres trigger `enforce_grind_domain` on `auth.users` insert rejects
+   any email not matching `%@grind.co.uk`. This fires regardless of how the
+   user is created (magic link, OAuth, admin panel), so even if the sign-up
+   toggle is accidentally re-enabled, non-Grind addresses are still blocked
+   at the database level.
+
+Vercel redirect URLs include both production and a
+`https://meridian-*-greenptom.vercel.app/**` wildcard so all preview branches
+work without manual addition.
+
+Adding a new team member: Authentication → Users → Add user → enter their
+@grind.co.uk email → they receive a magic link.
