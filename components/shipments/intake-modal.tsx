@@ -284,18 +284,24 @@ export function IntakeModal({
   // Reference options held as local state so the inner "Add new" modal
   // can append the freshly created row without round-tripping through a
   // router.refresh (which would blank the intake mid-flow).
+  //
+  // The page-level queries include archived rows for the detail panel
+  // JOIN; we filter to active only here so the combobox doesn't offer
+  // archived refs as picks.
   const [hauliers, setHauliers] = useState<RefOption[]>(() =>
-    initialHauliers.map((h) => ({ id: h.id, name: h.name, secondary: h.country })),
+    initialHauliers
+      .filter((h) => !h.deleted_at)
+      .map((h) => ({ id: h.id, name: h.name, secondary: h.country })),
   );
   const [suppliers, setSuppliers] = useState<RefOption[]>(() =>
-    initialSuppliers.map((s) => ({
-      id: s.id,
-      name: s.name,
-      secondary: s.country,
-    })),
+    initialSuppliers
+      .filter((s) => !s.deleted_at)
+      .map((s) => ({ id: s.id, name: s.name, secondary: s.country })),
   );
   const [iors, setIors] = useState<RefOption[]>(() =>
-    initialIors.map((i) => ({ id: i.id, name: i.name, secondary: i.country })),
+    initialIors
+      .filter((i) => !i.deleted_at)
+      .map((i) => ({ id: i.id, name: i.name, secondary: i.country })),
   );
 
   const [addNew, setAddNew] = useState<{

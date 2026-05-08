@@ -155,6 +155,9 @@ export function ShipmentsView({
         shipments={shipments}
         documentsByShipment={documentsByShipment}
         eventsByShipment={eventsByShipment}
+        hauliers={hauliers}
+        suppliers={suppliers}
+        iors={iors}
         onEdit={openEdit}
         hideFilters={headerVariant === "drafts" || headerVariant === "archive"}
         destinationFilter={destinationFilter}

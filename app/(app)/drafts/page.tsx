@@ -33,21 +33,11 @@ export default async function DraftsPage() {
       .limit(100),
     supabase.from("incoterms").select("*").order("code"),
     supabase.from("commodity_codes").select("*").order("product_type"),
-    supabase
-      .from("hauliers")
-      .select("*")
-      .is("deleted_at", null)
-      .order("name"),
-    supabase
-      .from("suppliers")
-      .select("*")
-      .is("deleted_at", null)
-      .order("name"),
-    supabase
-      .from("iors")
-      .select("*")
-      .is("deleted_at", null)
-      .order("name"),
+    // Includes archived rows for the detail panel JOIN; IntakeModal
+    // filters to active only when building combobox options.
+    supabase.from("hauliers").select("*").order("name"),
+    supabase.from("suppliers").select("*").order("name"),
+    supabase.from("iors").select("*").order("name"),
   ]);
 
   const rows = (shipments ?? []) as Shipment[];

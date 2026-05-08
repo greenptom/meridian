@@ -17,6 +17,15 @@ Source: 5c.2.1 hotfix preview test pass.
 The banner ships in a working state. Specific tweaks not yet captured —
 revisit when doing a wider UX polish pass.
 
+### IOR detail subscript: consider swapping EORI for VAT number once schema gains the field
+Status: deferred (no phase assigned)
+Source: 5c.3 plan discussion.
+The detail panel's IOR subscript currently shows `vat_country · eori_number`.
+VAT number would be the more universally relevant identifier for an IOR
+across jurisdictions (EU + post-Brexit UK); EORI is customs-specific. The
+`iors` schema doesn't have a `vat_number` column today — add it before
+swapping the subscript field.
+
 ---
 
 ## Data model gaps
