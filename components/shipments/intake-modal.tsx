@@ -267,6 +267,7 @@ export function IntakeModal({
   focusField?: string | null;
 }) {
   const isEditing = !!editingShipment;
+  const isArchived = editingShipment?.archived_at != null;
   const router = useRouter();
   const [tab, setTab] = useState<0 | 1 | 2>(isEditing ? 2 : 0);
   const [isPending, startTransition] = useTransition();
@@ -666,6 +667,23 @@ export function IntakeModal({
         </header>
 
         <div className="overflow-y-auto flex-1 px-7 py-6">
+          {isArchived && (
+            <div
+              className="mb-5 px-4 py-3 rounded-md border flex items-baseline gap-3"
+              style={{
+                background: "var(--color-paper-warm)",
+                borderColor: "var(--color-line)",
+                color: "var(--color-ink)",
+              }}
+            >
+              <span className="font-mono text-[10px] uppercase tracking-widest text-[color:var(--color-ink-faint)]">
+                Archived
+              </span>
+              <span className="text-[13px]">
+                This shipment is archived. Restore it to make changes.
+              </span>
+            </div>
+          )}
           {!isEditing && (
             <div
               className="flex gap-1 p-1 rounded-lg border mb-5"
@@ -1157,8 +1175,9 @@ export function IntakeModal({
             <button
               type="submit"
               form="intake-form"
-              className="btn btn-primary"
-              disabled={isPending || !showForm}
+              className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isPending || !showForm || isArchived}
+              title={isArchived ? "Archived — restore to edit" : undefined}
             >
               {isPending
                 ? "Saving…"

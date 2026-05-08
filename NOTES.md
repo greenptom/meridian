@@ -98,3 +98,13 @@ table's `batch_id` FK and `shipment_events_type_check` first, then drop
 triggers / helper functions). Leaving them in place is harmless; no
 code path writes to them, and the `shipment_events` additions are
 non-breaking.
+
+
+
+## Archived shipment edit guard
+
+Archived shipments previously hit the action-layer "closed/archived"
+guard in `updateShipment`, with the error rendered below the fold of
+the scrollable intake form. Banner + disabled save in the intake modal
+prevents the path entirely; the underlying guard is retained as
+defence-in-depth.
