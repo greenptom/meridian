@@ -14,6 +14,7 @@ export default function LoginPage() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/api/auth/callback`,
+        queryParams: { hd: "grind.co.uk" },
       },
     });
   }
